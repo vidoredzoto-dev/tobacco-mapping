@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tobacco Cultivation Mapping — KRB ADSE</title>
+
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Local Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-dot"></div>
+    <div>
+      <h1>Tobacco Cultivation Mapping — Harare Province</h1>
+      <p>KRB ADSE · Random Forest · Sentinel-2 SR · 2025–26 Season</p>
+    </div>
+  </div>
+  <span class="header-badge" id="feature-badge">Loading…</span>
+</header>
+
+<div class="app-body">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+
+    <!-- Basemaps -->
+    <div class="sidebar-section">
+      <h3>Basemap</h3>
+      <div class="basemap-grid">
+        <button class="basemap-btn" data-basemap="osm">🗺️ OSM</button>
+        <button class="basemap-btn active" data-basemap="satellite">🛰️ Satellite</button>
+        <button class="basemap-btn" data-basemap="terrain">⛰️ Terrain</button>
+        <button class="basemap-btn" data-basemap="dark">🌑 Dark</button>
+      </div>
+    </div>
+
+    <!-- Layers -->
+    <div class="sidebar-section">
+      <h3>Layers</h3>
+      <div id="layer-controls"></div>
+    </div>
+
+    <!-- Opacity -->
+    <div class="sidebar-section">
+      <h3>Global Opacity</h3>
+      <div class="opacity-row">
+        <label>Fill</label>
+        <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="0.75">
+        <span class="opacity-val" id="opacity-val">75%</span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-section">
+      <h3>Accuracy Metrics</h3>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="val">81.35%</div><div class="lbl">Overall Accuracy</div></div>
+        <div class="stat-card"><div class="val">0.762</div><div class="lbl">Kappa</div></div>
+        <div class="stat-card"><div class="val" id="stat-tobacco">—</div><div class="lbl">Tobacco Area (ha)</div></div>
+        <div class="stat-card"><div class="val" id="stat-total">—</div><div class="lbl">Total Features</div></div>
+      </div>
+    </div>
+
+    <!-- Class breakdown -->
+    <div class="sidebar-section">
+      <h3>Class Breakdown</h3>
+      <div id="class-breakdown"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="sidebar-section">
+      <h3>Legend (click to highlight)</h3>
+      <div id="legend-items"></div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <button id="sidebar-toggle">◀</button>
+
+  <!-- Map Container -->
+  <div id="map-container">
+    <div id="loading"><div class="spinner"></div><p id="loading-msg">Fetching GeoJSON…</p></div>
+    <div id="error-toast"></div>
+    <div id="map"></div>
+
+    <div id="search-box">
+      <span style="color:#475569;font-size:14px;">🔍</span>
+      <input id="search-input" type="text" placeholder="Search class name…" />
+    </div>
+
+    <div id="map-toolbar">
+      <button class="map-btn" id="btn-zoom-all" title="Zoom to all features">⊞</button>
+      <button class="map-btn" id="label-btn" title="Toggle labels">🏷</button>
+      <button class="map-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
+      <button class="map-btn" id="btn-export" title="Export GeoJSON">⬇</button>
+    </div>
+
+    <div id="info-panel">
+      <button id="info-close">✕</button>
+      <h4 id="info-title">Feature</h4>
+      <div id="info-body"></div>
+    </div>
+
+    <div id="coord-bar">
+      <span id="coord-lat">Lat: —</span>
+      <span id="coord-lng">Lng: —</span>
+      <span id="coord-zoom">Zoom: —</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
