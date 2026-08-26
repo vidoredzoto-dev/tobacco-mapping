@@ -1,424 +1,1061 @@
-// ═══════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════
-const DATA_FILES = {
-  tobacco: 'data/tobacco_landcover_harare_2025.geojson',
+```javascript
+/* ============================================================
+   TOBACCO CULTIVATION MAPPING — KRB ADSE
+   GeoJSON layers are loaded automatically on startup.
+   ============================================================ */
+
+const DATA_PATH = "data/";
+
+/* ------------------------------------------------------------
+   MAP INITIALISATION
+   ------------------------------------------------------------ */
+
+const map = L.map("map", {
+  center: [-17.8252, 31.0335],
+  zoom: 9,
+  zoomControl: true
+});
+
+/* ------------------------------------------------------------
+   BASEMAPS
+   ------------------------------------------------------------ */
+
+const basemaps = {
+  osm: L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 20
+    }
+  ),
+
+  satellite: L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+      attribution: "Tiles &copy; Esri",
+      maxZoom: 20
+    }
+  ),
+
+  terrain: L.tileLayer(
+    "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    {
+      attribution: "&copy; OpenTopoMap contributors",
+      maxZoom: 17
+    }
+  ),
+
+  dark: L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      attribution: "&copy; CARTO",
+      maxZoom: 20
+    }
+  )
 };
 
-const CLASSES = [
-  { id: 0, name: 'Tobacco',      color: '#e5ff3a' },
-  { id: 1, name: 'Trees',        color: '#006400' },
-  { id: 2, name: 'Grassland',    color: '#7CFC00' },
-  { id: 3, name: 'Bare Ground', color: '#D2691E' },
-  { id: 4, name: 'Built-up',     color: '#A0522D' },
-  { id: 5, name: 'Water',        color: '#3eceff' },
+basemaps.satellite.addTo(map);
+
+/* ------------------------------------------------------------
+   GEOJSON CONFIGURATION
+   ------------------------------------------------------------ */
+
+const layerConfig = [
+  {
+    name: "Research Trial",
+    file: "Research_trial.geojson",
+    color: "#e11d48",
+    fillColor: "#fb7185"
+  },
+  {
+    name: "TRB Boundary",
+    file: "TRB_Boundary.geojson",
+    color: "#7c3aed",
+    fillColor: "#a78bfa"
+  },
+  {
+    name: "Dams",
+    file: "dams.geojson",
+    color: "#0284c7",
+    fillColor: "#38bdf8"
+  },
+  {
+    name: "Kutsaga Classification",
+    file: "kutsaga_classification.geojson",
+    color: "#16a34a",
+    fillColor: "#4ade80"
+  },
+  {
+    name: "Land 9",
+    file: "land9.geojson",
+    color: "#ca8a04",
+    fillColor: "#facc15"
+  },
+  {
+    name: "Land 1",
+    file: "land_1.geojson",
+    color: "#ea580c",
+    fillColor: "#fb923c"
+  },
+  {
+    name: "Land 10",
+    file: "land_10.geojson",
+    color: "#0891b2",
+    fillColor: "#22d3ee"
+  },
+  {
+    name: "Land 4",
+    file: "land_4.geojson",
+    color: "#9333ea",
+    fillColor: "#c084fc"
+  },
+  {
+    name: "Land 4A",
+    file: "land_4a.geojson",
+    color: "#db2777",
+    fillColor: "#f472b6"
+  },
+  {
+    name: "Land 9",
+    file: "land_9.geojson",
+    color: "#65a30d",
+    fillColor: "#a3e635"
+  },
+  {
+    name: "Rivers",
+    file: "rivers.geojson",
+    color: "#2563eb",
+    fillColor: "#60a5fa",
+    line: true
+  },
+  {
+    name: "Roads",
+    file: "roads.geojson",
+    color: "#f97316",
+    fillColor: "#fdba74",
+    line: true
+  }
 ];
 
-const CLASS_MAP = {};
-CLASSES.forEach(c => { CLASS_MAP[c.id] = c; CLASS_MAP[c.name] = c; });
+/* ------------------------------------------------------------
+   GLOBAL VARIABLES
+   ------------------------------------------------------------ */
 
-// ═══════════════════════════════════════════════════════
-// Basemaps
-// ═══════════════════════════════════════════════════════
-const TILES = {
-  osm:       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-               { attribution:'© OpenStreetMap', maxZoom:19 }),
-  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-               { attribution:'© Esri', maxZoom:19 }),
-  terrain:   L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-               { attribution:'© OpenTopoMap', maxZoom:17 }),
-  dark:      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-               { attribution:'© CARTO', maxZoom:19 }),
-};
+const geojsonLayers = {};
+const loadedData = {};
+let allLayersGroup = L.featureGroup();
 
-// ═══════════════════════════════════════════════════════
-// Map initialization
-// ═══════════════════════════════════════════════════════
-const map = L.map('map', {
-  center: [-17.83, 31.05],
-  zoom: 11,
-  zoomControl: true,
-  layers: [TILES.satellite],
-});
-
-let currentBasemap = 'satellite';
-let globalFillOpacity = 0.75;
-let geoLayer = null;
-let rawGeoJSON = null;
-let labelLayer = null;
+let globalOpacity = 0.75;
 let labelsVisible = false;
-let highlightedClass = null;
-let sidebarOpen = true;
+let selectedClass = null;
 
-const classVisible = {};
-CLASSES.forEach(c => { classVisible[c.id] = true; });
+/* ------------------------------------------------------------
+   UTILITY FUNCTIONS
+   ------------------------------------------------------------ */
 
-// ═══════════════════════════════════════════════════════
-// Event Listeners & Bootstrapping
-// ═══════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  setupEventListeners();
-  buildSidebarControls();
-  loadGeoJSON();
-});
+function setLoading(message) {
+  const loading = document.getElementById("loading");
+  const messageElement = document.getElementById("loading-msg");
 
-function setupEventListeners() {
-  // Map mouse events
-  map.on('mousemove', e => {
-    document.getElementById('coord-lat').textContent = 'Lat: ' + e.latlng.lat.toFixed(5);
-    document.getElementById('coord-lng').textContent = 'Lng: ' + e.latlng.lng.toFixed(5);
-  });
-  
-  map.on('zoomend', () => {
-    document.getElementById('coord-zoom').textContent = 'Zoom: ' + map.getZoom();
-  });
-
-  // Basemap switchers
-  document.querySelectorAll('.basemap-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const type = e.currentTarget.getAttribute('data-basemap');
-      switchBasemap(type, e.currentTarget);
-    });
-  });
-
-  // Opacity Slider
-  const opacitySlider = document.getElementById('opacity-slider');
-  opacitySlider.addEventListener('input', (e) => {
-    const val = e.target.value;
-    setGlobalOpacity(val);
-    document.getElementById('opacity-val').textContent = Math.round(val * 100) + '%';
-  });
-
-  // UI Buttons
-  document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
-  document.getElementById('info-close').addEventListener('click', closeInfo);
-  document.getElementById('search-input').addEventListener('input', (e) => searchClass(e.target.value));
-
-  // Toolbar Actions
-  document.getElementById('btn-zoom-all').addEventListener('click', zoomToAll);
-  document.getElementById('label-btn').addEventListener('click', (e) => toggleLabels(e.currentTarget));
-  document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
-  document.getElementById('btn-export').addEventListener('click', exportGeoJSON);
-}
-
-// ═══════════════════════════════════════════════════════
-// Build sidebar controls from CLASSES
-// ═══════════════════════════════════════════════════════
-function buildSidebarControls() {
-  const ctrl = document.getElementById('layer-controls');
-  CLASSES.forEach(c => {
-    const item = document.createElement('div');
-    item.className = 'layer-item';
-    item.innerHTML = `
-      <div class="layer-left">
-        <div class="layer-swatch" style="background:${c.color};"></div>
-        <div>
-          <div class="layer-name">${c.name}</div>
-          <div class="layer-sub" id="count-${c.id}">— polygons</div>
-        </div>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" checked data-class-id="${c.id}">
-        <div class="toggle-track"></div>
-        <div class="toggle-thumb"></div>
-      </label>`;
-    
-    item.querySelector('input').addEventListener('change', (e) => {
-      toggleClass(c.id, e.target.checked);
-    });
-    
-    ctrl.appendChild(item);
-  });
-
-  const leg = document.getElementById('legend-items');
-  CLASSES.forEach(c => {
-    const row = document.createElement('div');
-    row.className = 'legend-row';
-    row.id = `leg-${c.id}`;
-    row.innerHTML = `<div class="legend-color" style="background:${c.color};"></div>${c.name}`;
-    row.addEventListener('click', () => highlightClass(c.id));
-    leg.appendChild(row);
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-// Fetch & render GeoJSON
-// ═══════════════════════════════════════════════════════
-async function loadGeoJSON() {
-  setLoading('Loading local GeoJSON…');
-  try {
-    const res = await fetch(DATA_FILES.tobacco);
-    if (!res.ok) throw new Error(`HTTP ${res.status} — verify local file path in DATA_FILES`);
-    rawGeoJSON = await res.json();
-  } catch(e) {
-    showError('Could not load GeoJSON: ' + e.message + '. Running demo data.');
-    rawGeoJSON = buildDemoGeoJSON();
+  if (messageElement) {
+    messageElement.textContent = message;
   }
 
-  setLoading('Rendering polygons…');
-  renderLayer();
-  buildStats();
-  document.getElementById('loading').classList.add('hidden');
+  if (loading) {
+    loading.style.display = "flex";
+  }
 }
 
-function renderLayer() {
-  if (geoLayer) map.removeLayer(geoLayer);
-  if (labelLayer) map.removeLayer(labelLayer);
-  labelsVisible = false;
-  document.getElementById('label-btn').classList.remove('active');
+function hideLoading() {
+  const loading = document.getElementById("loading");
 
-  geoLayer = L.geoJSON(rawGeoJSON, {
-    style: styleFeature,
-    filter: featureVisible,
-    onEachFeature: (feature, layer) => {
-      layer.on({
-        click:     () => showInfo(feature.properties),
-        mouseover: function() { this.setStyle({ weight: 2.5, color: '#ffffff' }); },
-        mouseout:  function() { geoLayer.resetStyle(this); },
-      });
+  if (loading) {
+    loading.style.display = "none";
+  }
+}
+
+function showError(message) {
+  const toast = document.getElementById("error-toast");
+
+  if (toast) {
+    toast.textContent = message;
+    toast.style.display = "block";
+
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 7000);
+  }
+
+  console.error(message);
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function getFeatureCount() {
+  let count = 0;
+
+  Object.values(loadedData).forEach(data => {
+    if (data && Array.isArray(data.features)) {
+      count += data.features.length;
     }
-  }).addTo(map);
+  });
 
-  try { map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] }); } catch(e) {}
-
-  const total = rawGeoJSON.features?.length || 0;
-  document.getElementById('feature-badge').textContent = `${total.toLocaleString()} features`;
-  document.getElementById('stat-total').textContent = total.toLocaleString();
+  return count;
 }
 
-function styleFeature(feature) {
-  const cls = getClass(feature.properties);
+/* ------------------------------------------------------------
+   FEATURE STYLING
+   ------------------------------------------------------------ */
+
+function getStyle(config) {
+  if (config.line) {
+    return {
+      color: config.color,
+      weight: config.name === "Rivers" ? 2.5 : 2,
+      opacity: 0.9
+    };
+  }
+
   return {
-    color: '#111',
-    weight: 0.4,
-    fillColor: cls ? cls.color : '#888',
-    fillOpacity: globalFillOpacity,
+    color: config.color,
+    weight: 1.5,
+    opacity: 0.9,
+    fillColor: config.fillColor || config.color,
+    fillOpacity: globalOpacity
   };
 }
 
-function featureVisible(feature) {
-  const cls = getClass(feature.properties);
-  if (!cls) return true;
-  return classVisible[cls.id] !== false;
-}
+/* ------------------------------------------------------------
+   POPUP / INFO PANEL
+   ------------------------------------------------------------ */
 
-function getClass(props) {
-  if (!props) return null;
-  if (props.class !== undefined && CLASS_MAP[props.class]) return CLASS_MAP[props.class];
-  if (props.class_name && CLASS_MAP[props.class_name]) return CLASS_MAP[props.class_name];
-  return null;
-}
+function showFeatureInfo(feature, layerName) {
+  const panel = document.getElementById("info-panel");
+  const title = document.getElementById("info-title");
+  const body = document.getElementById("info-body");
 
-// ═══════════════════════════════════════════════════════
-// Stats & breakdown
-// ═══════════════════════════════════════════════════════
-function buildStats() {
-  const features = rawGeoJSON.features || [];
-  const counts = {};
-  CLASSES.forEach(c => { counts[c.id] = 0; });
+  if (!panel || !title || !body) return;
 
-  features.forEach(f => {
-    const cls = getClass(f.properties);
-    if (cls) counts[cls.id]++;
-  });
+  title.textContent = layerName;
 
-  const total = features.length;
-  CLASSES.forEach(c => {
-    const el = document.getElementById(`count-${c.id}`);
-    if (el) el.textContent = `${counts[c.id].toLocaleString()} polygons`;
-  });
+  const properties = feature.properties || {};
 
-  const tobaccoFeatures = features.filter(f => getClass(f.properties)?.id === 0);
-  const totalHa = tobaccoFeatures.reduce((s, f) => s + (f.properties?.area_ha || 0), 0);
-  document.getElementById('stat-tobacco').textContent =
-    totalHa > 0 ? totalHa.toFixed(1) : '1,975.6';
+  let html = "";
 
-  const bd = document.getElementById('class-breakdown');
-  bd.innerHTML = '';
-  CLASSES.forEach(c => {
-    const pct = total > 0 ? ((counts[c.id] / total) * 100).toFixed(1) : 0;
-    bd.innerHTML += `
-      <div class="class-bar-row">
-        <div class="class-bar-label">
-          <span>${c.name}</span>
-          <span>${counts[c.id].toLocaleString()} (${pct}%)</span>
-        </div>
-        <div class="class-bar-track">
-          <div class="class-bar-fill" style="width:${pct}%;background:${c.color};"></div>
-        </div>
-      </div>`;
-  });
-}
+  const keys = Object.keys(properties);
 
-// ═══════════════════════════════════════════════════════
-// Controls Logic
-// ═══════════════════════════════════════════════════════
-function toggleClass(classId, visible) {
-  classVisible[classId] = visible;
-  renderLayer();
-}
-
-function highlightClass(classId) {
-  if (highlightedClass === classId) {
-    highlightedClass = null;
-    document.querySelectorAll('.legend-row').forEach(r => r.classList.remove('dimmed'));
-    geoLayer?.eachLayer(l => geoLayer.resetStyle(l));
+  if (keys.length === 0) {
+    html = "<p>No attribute information available.</p>";
   } else {
-    highlightedClass = classId;
-    document.querySelectorAll('.legend-row').forEach(r => {
-      const id = parseInt(r.id.replace('leg-',''));
-      r.classList.toggle('dimmed', id !== classId);
+    keys.forEach(key => {
+      let value = properties[key];
+
+      if (value === null || value === undefined) {
+        value = "—";
+      }
+
+      if (typeof value === "object") {
+        value = JSON.stringify(value);
+      }
+
+      html += `
+        <div class="info-row">
+          <span class="info-key">${escapeHtml(key)}</span>
+          <span class="info-value">${escapeHtml(String(value))}</span>
+        </div>
+      `;
     });
-    geoLayer?.eachLayer(l => {
-      const cls = getClass(l.feature?.properties);
-      if (cls && cls.id !== classId) {
-        l.setStyle({ fillOpacity: 0.08, weight: 0.2 });
+  }
+
+  body.innerHTML = html;
+  panel.style.display = "block";
+}
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/* ------------------------------------------------------------
+   LOAD A SINGLE GEOJSON FILE
+   ------------------------------------------------------------ */
+
+async function loadGeoJSON(config) {
+  try {
+    const response = await fetch(DATA_PATH + config.file);
+
+    if (!response.ok) {
+      throw new Error(
+        `${config.file}: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    loadedData[config.file] = data;
+
+    const layer = L.geoJSON(data, {
+      style: () => getStyle(config),
+
+      pointToLayer: function(feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 6,
+          color: config.color,
+          weight: 1.5,
+          fillColor: config.fillColor || config.color,
+          fillOpacity: globalOpacity
+        });
+      },
+
+      onEachFeature: function(feature, leafletLayer) {
+        leafletLayer.on({
+          click: function() {
+            showFeatureInfo(feature, config.name);
+          },
+
+          mouseover: function(e) {
+            const target = e.target;
+
+            if (target.setStyle) {
+              target.setStyle({
+                weight: 3,
+                fillOpacity: Math.min(globalOpacity + 0.15, 1),
+                opacity: 1
+              });
+            }
+          },
+
+          mouseout: function(e) {
+            const target = e.target;
+
+            if (target.setStyle) {
+              target.setStyle(getStyle(config));
+            }
+          }
+        });
+
+        if (labelsVisible) {
+          addFeatureLabel(leafletLayer, feature, config);
+        }
+      }
+    });
+
+    geojsonLayers[config.file] = layer;
+
+    /*
+     * Add all loaded layers to the map automatically.
+     * The user can then turn individual layers off from
+     * the sidebar.
+     */
+    layer.addTo(map);
+
+    allLayersGroup.addLayer(layer);
+
+    addLayerControl(config, layer);
+
+    return {
+      success: true,
+      config,
+      layer,
+      data
+    };
+
+  } catch (error) {
+    console.error(`Failed to load ${config.file}:`, error);
+
+    showError(
+      `Could not load ${config.file}. Check that it exists in the data folder.`
+    );
+
+    addLayerControl(config, null, true);
+
+    return {
+      success: false,
+      config,
+      error
+    };
+  }
+}
+
+/* ------------------------------------------------------------
+   LOAD ALL GEOJSON FILES
+   ------------------------------------------------------------ */
+
+async function loadAllLayers() {
+  setLoading("Loading GeoJSON layers…");
+
+  const results = await Promise.all(
+    layerConfig.map(config => loadGeoJSON(config))
+  );
+
+  const successful = results.filter(result => result.success);
+
+  updateStatistics();
+  updateFeatureBadge();
+  updateClassBreakdown();
+  updateLegend();
+
+  if (successful.length > 0) {
+    const bounds = allLayersGroup.getBounds();
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [30, 30]
+      });
+    }
+  }
+
+  hideLoading();
+
+  if (successful.length === layerConfig.length) {
+    console.log("All GeoJSON layers loaded successfully.");
+  } else {
+    console.warn(
+      `${successful.length} of ${layerConfig.length} GeoJSON layers loaded.`
+    );
+  }
+}
+
+/* ------------------------------------------------------------
+   SIDEBAR LAYER CONTROLS
+   ------------------------------------------------------------ */
+
+function addLayerControl(config, layer, failed = false) {
+  const container = document.getElementById("layer-controls");
+
+  if (!container) return;
+
+  const id = "layer-" + config.file
+    .replace(/[^a-zA-Z0-9]/g, "-");
+
+  const row = document.createElement("div");
+
+  row.className = "layer-control";
+
+  row.innerHTML = `
+    <label for="${id}">
+      <input
+        type="checkbox"
+        id="${id}"
+        ${layer ? "checked" : ""}
+        ${failed ? "disabled" : ""}
+      >
+
+      <span
+        class="layer-color"
+        style="background:${config.color}"
+      ></span>
+
+      <span class="layer-name">
+        ${config.name}
+      </span>
+
+      ${failed ? '<span class="layer-error">⚠</span>' : ""}
+    </label>
+  `;
+
+  container.appendChild(row);
+
+  const checkbox = row.querySelector("input");
+
+  if (checkbox && layer) {
+    checkbox.addEventListener("change", function() {
+      if (this.checked) {
+        layer.addTo(map);
       } else {
-        l.setStyle({ fillOpacity: globalFillOpacity, weight: 1.5, color: '#fff' });
+        map.removeLayer(layer);
       }
     });
   }
 }
 
-function setGlobalOpacity(val) {
-  globalFillOpacity = parseFloat(val);
-  geoLayer?.eachLayer(l => geoLayer.resetStyle(l));
-}
+/* ------------------------------------------------------------
+   STATISTICS
+   ------------------------------------------------------------ */
 
-function switchBasemap(name, btn) {
-  map.removeLayer(TILES[currentBasemap]);
-  map.addLayer(TILES[name]);
-  currentBasemap = name;
-  document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
+function updateStatistics() {
+  const total = getFeatureCount();
 
-function showInfo(props) {
-  if (!props) return;
-  const cls = getClass(props);
-  document.getElementById('info-title').innerHTML =
-    cls ? `<span style="display:inline-block;width:10px;height:10px;background:${cls.color};border-radius:2px;margin-right:6px;"></span>${cls.name}` : 'Feature';
+  const totalElement = document.getElementById("stat-total");
 
-  const skip = ['geometry'];
-  document.getElementById('info-body').innerHTML =
-    Object.entries(props)
-      .filter(([k]) => !skip.includes(k))
-      .map(([k,v]) => `
-        <div class="info-row">
-          <span class="info-key">${k.replace(/_/g,' ')}</span>
-          <span class="info-val">${v ?? '—'}</span>
-        </div>`).join('');
+  if (totalElement) {
+    totalElement.textContent = formatNumber(total);
+  }
 
-  document.getElementById('info-panel').classList.add('visible');
-}
+  /*
+   * Try to calculate tobacco area from common attribute names.
+   */
 
-function closeInfo() { 
-  document.getElementById('info-panel').classList.remove('visible'); 
-}
+  let tobaccoArea = 0;
 
-function searchClass(query) {
-  const q = query.trim().toLowerCase();
-  if (!q || !geoLayer) return;
-  geoLayer.eachLayer(l => {
-    const cls = getClass(l.feature?.properties);
-    if (cls && cls.name.toLowerCase().includes(q)) {
-      try {
-        map.flyTo(l.getBounds ? l.getBounds().getCenter() : l.getLatLng(), 14, { duration: 1 });
-        showInfo(l.feature.properties);
-      } catch(e) {}
-      return false;
-    }
-  });
-}
+  Object.values(loadedData).forEach(data => {
+    if (!data || !data.features) return;
 
-function zoomToAll() {
-  if (geoLayer) try { map.fitBounds(geoLayer.getBounds(), { padding: [20,20] }); } catch(e) {}
-}
+    data.features.forEach(feature => {
+      const properties = feature.properties || {};
 
-function toggleLabels(btn) {
-  labelsVisible = !labelsVisible;
-  btn.classList.toggle('active', labelsVisible);
-  if (labelsVisible) {
-    const markers = [];
-    geoLayer?.eachLayer(l => {
-      try {
-        const center = l.getBounds().getCenter();
-        const cls = getClass(l.feature?.properties);
-        if (cls) {
-          markers.push(L.marker(center, {
-            icon: L.divIcon({
-              className: '',
-              html: `<div style="background:${cls.color};color:#000;font-size:9px;padding:1px 4px;border-radius:3px;white-space:nowrap;font-weight:600;">${cls.name}</div>`,
-              iconAnchor: [0,0],
-            })
-          }));
-        }
-      } catch(e) {}
+      const classValue =
+        properties.class ||
+        properties.Class ||
+        properties.CLASS ||
+        properties.classification ||
+        properties.Classification ||
+        properties.landcover ||
+        properties.LandCover ||
+        "";
+
+      const className = String(classValue).toLowerCase();
+
+      if (className.includes("tobacco")) {
+        const area =
+          properties.area_ha ||
+          properties.area_ha ||
+          properties.area ||
+          properties.Area ||
+          0;
+
+        tobaccoArea += Number(area) || 0;
+      }
     });
-    labelLayer = L.layerGroup(markers).addTo(map);
-  } else {
-    if (labelLayer) { map.removeLayer(labelLayer); labelLayer = null; }
+  });
+
+  const tobaccoElement = document.getElementById("stat-tobacco");
+
+  if (tobaccoElement) {
+    tobaccoElement.textContent =
+      tobaccoArea > 0
+        ? tobaccoArea.toFixed(2)
+        : "—";
   }
 }
 
-function toggleFullscreen() {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-  else document.exitFullscreen();
+function updateFeatureBadge() {
+  const badge = document.getElementById("feature-badge");
+
+  if (!badge) return;
+
+  badge.textContent =
+    `${formatNumber(getFeatureCount())} Features`;
 }
+
+/* ------------------------------------------------------------
+   CLASS BREAKDOWN
+   ------------------------------------------------------------ */
+
+function updateClassBreakdown() {
+  const container = document.getElementById("class-breakdown");
+
+  if (!container) return;
+
+  const classes = {};
+
+  Object.values(loadedData).forEach(data => {
+    if (!data || !data.features) return;
+
+    data.features.forEach(feature => {
+      const properties = feature.properties || {};
+
+      const classValue =
+        properties.class ||
+        properties.Class ||
+        properties.CLASS ||
+        properties.classification ||
+        properties.Classification ||
+        properties.landcover ||
+        properties.LandCover;
+
+      if (classValue !== undefined && classValue !== null) {
+        const key = String(classValue);
+
+        classes[key] = (classes[key] || 0) + 1;
+      }
+    });
+  });
+
+  const entries = Object.entries(classes)
+    .sort((a, b) => b[1] - a[1]);
+
+  if (entries.length === 0) {
+    container.innerHTML =
+      '<div class="empty-state">No classification attributes found.</div>';
+
+    return;
+  }
+
+  container.innerHTML = entries
+    .map(([name, count]) => `
+      <div class="class-row">
+        <span>${escapeHtml(name)}</span>
+        <strong>${formatNumber(count)}</strong>
+      </div>
+    `)
+    .join("");
+}
+
+/* ------------------------------------------------------------
+   LEGEND
+   ------------------------------------------------------------ */
+
+function updateLegend() {
+  const container = document.getElementById("legend-items");
+
+  if (!container) return;
+
+  container.innerHTML = layerConfig
+    .map(config => `
+      <div
+        class="legend-item"
+        data-layer="${escapeHtml(config.file)}"
+        title="Click to highlight"
+      >
+        <span
+          class="legend-color"
+          style="
+            background:${config.fillColor || config.color};
+            border-color:${config.color};
+          "
+        ></span>
+
+        <span>${escapeHtml(config.name)}</span>
+      </div>
+    `)
+    .join("");
+
+  container.querySelectorAll(".legend-item")
+    .forEach(item => {
+      item.addEventListener("click", function() {
+        const file = this.dataset.layer;
+
+        highlightLayer(file);
+      });
+    });
+}
+
+function highlightLayer(file) {
+  const targetLayer = geojsonLayers[file];
+
+  if (!targetLayer) return;
+
+  Object.entries(geojsonLayers).forEach(([layerFile, layer]) => {
+    if (!layer) return;
+
+    layer.eachLayer(child => {
+      if (child.setStyle) {
+        const config = layerConfig.find(
+          item => item.file === layerFile
+        );
+
+        if (!config) return;
+
+        if (layerFile === file) {
+          child.setStyle({
+            weight: 4,
+            color: "#ffffff",
+            fillOpacity: 0.9
+          });
+        } else {
+          child.setStyle(getStyle(config));
+        }
+      }
+    });
+  });
+
+  const bounds = targetLayer.getBounds();
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, {
+      padding: [40, 40]
+    });
+  }
+
+  selectedClass = file;
+}
+
+/* ------------------------------------------------------------
+   OPACITY
+   ------------------------------------------------------------ */
+
+function updateOpacity(value) {
+  globalOpacity = Number(value);
+
+  document.getElementById("opacity-val").textContent =
+    `${Math.round(globalOpacity * 100)}%`;
+
+  Object.entries(geojsonLayers).forEach(([file, layer]) => {
+    if (!layer) return;
+
+    const config = layerConfig.find(
+      item => item.file === file
+    );
+
+    if (!config) return;
+
+    layer.eachLayer(child => {
+      if (child.setStyle) {
+        if (config.line) {
+          child.setStyle({
+            opacity: globalOpacity
+          });
+        } else {
+          child.setStyle({
+            fillOpacity: globalOpacity,
+            opacity: globalOpacity
+          });
+        }
+      }
+    });
+  });
+}
+
+/* ------------------------------------------------------------
+   LABELS
+   ------------------------------------------------------------ */
+
+function getFeatureLabel(feature) {
+  const properties = feature.properties || {};
+
+  return (
+    properties.name ||
+    properties.Name ||
+    properties.NAME ||
+    properties.class ||
+    properties.Class ||
+    properties.CLASS ||
+    properties.id ||
+    properties.ID ||
+    ""
+  );
+}
+
+function addFeatureLabel(layer, feature, config) {
+  const label = getFeatureLabel(feature);
+
+  if (!label) return;
+
+  layer.bindTooltip(String(label), {
+    permanent: true,
+    direction: "center",
+    className: "geojson-label"
+  });
+}
+
+function toggleLabels() {
+  labelsVisible = !labelsVisible;
+
+  Object.entries(geojsonLayers).forEach(([file, layer]) => {
+    if (!layer) return;
+
+    const config = layerConfig.find(
+      item => item.file === file
+    );
+
+    layer.eachLayer(child => {
+      if (labelsVisible) {
+        addFeatureLabel(child, child.feature, config);
+      } else if (child.getTooltip()) {
+        child.unbindTooltip();
+      }
+    });
+  });
+
+  const button = document.getElementById("label-btn");
+
+  if (button) {
+    button.classList.toggle("active", labelsVisible);
+  }
+}
+
+/* ------------------------------------------------------------
+   SEARCH
+   ------------------------------------------------------------ */
+
+function searchFeatures(query) {
+  const search = query.trim().toLowerCase();
+
+  if (!search) {
+    resetHighlighting();
+    return;
+  }
+
+  Object.entries(geojsonLayers).forEach(([file, layer]) => {
+    if (!layer) return;
+
+    layer.eachLayer(child => {
+      const feature = child.feature;
+
+      if (!feature) return;
+
+      const properties = feature.properties || {};
+
+      const text = Object.values(properties)
+        .join(" ")
+        .toLowerCase();
+
+      if (text.includes(search)) {
+        if (child.setStyle) {
+          child.setStyle({
+            color: "#ffffff",
+            weight: 4,
+            fillOpacity: 1
+          });
+        }
+      } else {
+        const config = layerConfig.find(
+          item => item.file === file
+        );
+
+        if (child.setStyle && config) {
+          child.setStyle(getStyle(config));
+        }
+      }
+    });
+  });
+}
+
+function resetHighlighting() {
+  Object.entries(geojsonLayers).forEach(([file, layer]) => {
+    if (!layer) return;
+
+    const config = layerConfig.find(
+      item => item.file === file
+    );
+
+    if (!config) return;
+
+    layer.eachLayer(child => {
+      if (child.setStyle) {
+        child.setStyle(getStyle(config));
+      }
+    });
+  });
+}
+
+/* ------------------------------------------------------------
+   EXPORT GEOJSON
+   ------------------------------------------------------------ */
 
 function exportGeoJSON() {
-  if (!rawGeoJSON) return;
-  const blob = new Blob([JSON.stringify(rawGeoJSON, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'tobacco_landcover_harare_2025.geojson';
-  a.click();
+  const exportData = {
+    type: "FeatureCollection",
+    features: []
+  };
+
+  Object.values(loadedData).forEach(data => {
+    if (!data || !data.features) return;
+
+    data.features.forEach(feature => {
+      exportData.features.push(feature);
+    });
+  });
+
+  const blob = new Blob(
+    [JSON.stringify(exportData, null, 2)],
+    {
+      type: "application/geo+json"
+    }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "KRB_ADSE_all_layers.geojson";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
 }
 
-function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
-  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
-  const btn = document.getElementById('sidebar-toggle');
-  btn.textContent = sidebarOpen ? '◀' : '▶';
-  btn.style.left = sidebarOpen ? '280px' : '0';
-  setTimeout(() => map.invalidateSize(), 310);
+/* ------------------------------------------------------------
+   EVENT HANDLERS
+   ------------------------------------------------------------ */
+
+/* Basemap buttons */
+
+document.querySelectorAll(".basemap-btn")
+  .forEach(button => {
+    button.addEventListener("click", function() {
+
+      const basemapName = this.dataset.basemap;
+
+      Object.values(basemaps).forEach(layer => {
+        map.removeLayer(layer);
+      });
+
+      basemaps[basemapName].addTo(map);
+
+      document.querySelectorAll(".basemap-btn")
+        .forEach(btn => btn.classList.remove("active"));
+
+      this.classList.add("active");
+    });
+  });
+
+/* Opacity */
+
+const opacitySlider =
+  document.getElementById("opacity-slider");
+
+if (opacitySlider) {
+  opacitySlider.addEventListener("input", function() {
+    updateOpacity(this.value);
+  });
 }
 
-function setLoading(msg) {
-  document.getElementById('loading').classList.remove('hidden');
-  document.getElementById('loading-msg').textContent = msg;
+/* Search */
+
+const searchInput =
+  document.getElementById("search-input");
+
+if (searchInput) {
+  searchInput.addEventListener("input", function() {
+    searchFeatures(this.value);
+  });
 }
 
-function showError(msg) {
-  const el = document.getElementById('error-toast');
-  el.textContent = msg;
-  el.classList.add('visible');
-  setTimeout(() => el.classList.remove('visible'), 6000);
-}
+/* Zoom all */
 
-function buildDemoGeoJSON() {
-  const features = [];
-  const base = { lat: -17.83, lng: 31.05 };
-  const perClass = 8;
-  CLASSES.forEach((cls) => {
-    for (let i = 0; i < perClass; i++) {
-      const lat = base.lat + (Math.random() - 0.5) * 0.4;
-      const lng = base.lng + (Math.random() - 0.5) * 0.4;
-      const d   = 0.005 + Math.random() * 0.012;
-      features.push({
-        type: 'Feature',
-        properties: {
-          class: cls.id,
-          class_name: cls.name,
-          area_ha: cls.id === 0 ? +(Math.random()*25+3).toFixed(2) : undefined,
-          label: `${cls.name} polygon ${i+1}`,
-        },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[[lng-d,lat-d],[lng+d,lat-d],[lng+d,lat+d],[lng-d,lat+d],[lng-d,lat-d]]]
-        }
+const zoomAllButton =
+  document.getElementById("btn-zoom-all");
+
+if (zoomAllButton) {
+  zoomAllButton.addEventListener("click", function() {
+
+    const bounds = allLayersGroup.getBounds();
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [30, 30]
       });
     }
   });
-  return { type: 'FeatureCollection', features };
 }
+
+/* Labels */
+
+const labelButton =
+  document.getElementById("label-btn");
+
+if (labelButton) {
+  labelButton.addEventListener("click", toggleLabels);
+}
+
+/* Fullscreen */
+
+const fullscreenButton =
+  document.getElementById("btn-fullscreen");
+
+if (fullscreenButton) {
+  fullscreenButton.addEventListener("click", function() {
+
+    const container =
+      document.getElementById("map-container");
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  });
+}
+
+/* Export */
+
+const exportButton =
+  document.getElementById("btn-export");
+
+if (exportButton) {
+  exportButton.addEventListener("click", exportGeoJSON);
+}
+
+/* Info close */
+
+const infoClose =
+  document.getElementById("info-close");
+
+if (infoClose) {
+  infoClose.addEventListener("click", function() {
+    document.getElementById("info-panel").style.display =
+      "none";
+  });
+}
+
+/* Sidebar toggle */
+
+const sidebarToggle =
+  document.getElementById("sidebar-toggle");
+
+if (sidebarToggle) {
+  sidebarToggle.addEventListener("click", function() {
+
+    const sidebar =
+      document.getElementById("sidebar");
+
+    sidebar.classList.toggle("collapsed");
+
+    this.textContent =
+      sidebar.classList.contains("collapsed")
+        ? "▶"
+        : "◀";
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+  });
+}
+
+/* Map coordinates */
+
+map.on("mousemove", function(e) {
+  const latElement =
+    document.getElementById("coord-lat");
+
+  const lngElement =
+    document.getElementById("coord-lng");
+
+  const zoomElement =
+    document.getElementById("coord-zoom");
+
+  if (latElement) {
+    latElement.textContent =
+      `Lat: ${e.latlng.lat.toFixed(5)}`;
+  }
+
+  if (lngElement) {
+    lngElement.textContent =
+      `Lng: ${e.latlng.lng.toFixed(5)}`;
+  }
+
+  if (zoomElement) {
+    zoomElement.textContent =
+      `Zoom: ${map.getZoom()}`;
+  }
+});
+
+map.on("zoomend", function() {
+  const zoomElement =
+    document.getElementById("coord-zoom");
+
+  if (zoomElement) {
+    zoomElement.textContent =
+      `Zoom: ${map.getZoom()}`;
+  }
+});
+
+/* ------------------------------------------------------------
+   APPLICATION STARTUP
+   ------------------------------------------------------------ */
+
+document.addEventListener("DOMContentLoaded", function() {
+  loadAllLayers();
+});
+```
