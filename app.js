@@ -1,13 +1,16 @@
-// ============================================================
-// KRB · KUTSAGA AGRICULTURAL OBSERVATORY
-// Main Application JavaScript
-// ============================================================
+/* ============================================================
+   KRB · KUTSAGA AGRICULTURAL OBSERVATORY
+   Main Application JavaScript
+   ============================================================ */
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
+'use strict';
+
+/* ============================================================
+   CONFIGURATION
+   ============================================================ */
 
 const LAYERS_CONFIG = {
+
   dams: {
     file: 'dams.geojson',
     color: '#3a7ebf',
@@ -122,13 +125,14 @@ const LAYERS_CONFIG = {
 };
 
 
-// ============================================================
-// GLOBAL STATE
-// ============================================================
+/* ============================================================
+   GLOBAL STATE
+   ============================================================ */
+
+let map = null;
 
 const layers = {};
 
-let map = null;
 let currentOpacity = 0.8;
 let activeBasemap = 'satellite';
 
@@ -137,9 +141,27 @@ let ndviBarInstance = null;
 let landUseChartInstance = null;
 
 
-// ============================================================
-// BASEMAPS
-// ============================================================
+/* ============================================================
+   LAND LAYER KEYS
+   ============================================================ */
+
+const LAND_KEYS = [
+  'land1ab',
+  'land1',
+  'land2',
+  'land3',
+  'land4',
+  'land5',
+  'land6',
+  'land7',
+  'land8',
+  'land9'
+];
+
+
+/* ============================================================
+   BASEMAPS
+   ============================================================ */
 
 const BASEMAPS = {
 
@@ -169,14 +191,19 @@ const BASEMAPS = {
 };
 
 
-// ============================================================
-// MAP INITIALISATION
-// ============================================================
+/* ============================================================
+   MAP INITIALISATION
+   ============================================================ */
 
 function initializeMap() {
 
+  if (typeof L === 'undefined') {
+    console.error('Leaflet has not loaded.');
+    return;
+  }
+
   map = L.map('map', {
-    center: [-17.75, 31.0],
+    center: [-17.75, 31.00],
     zoom: 14,
     zoomControl: true,
     layers: [BASEMAPS.satellite]
@@ -190,9 +217,9 @@ function initializeMap() {
 }
 
 
-// ============================================================
-// COORDINATE TRACKER
-// ============================================================
+/* ============================================================
+   COORDINATE TRACKER
+   ============================================================ */
 
 function initializeCoordinateTracker() {
 
@@ -220,20 +247,51 @@ function initializeCoordinateTracker() {
       coordInfo.textContent = coordinateText;
     }
   });
+
+  map.on('zoomend', function () {
+
+    const zoom = map.getZoom();
+
+    const coordBar =
+      document.getElementById('coord-bar');
+
+    if (coordBar && map._lastMouseEvent) {
+      const lat = map._lastMouseEvent.latlng.lat.toFixed(6);
+      const lon = map._lastMouseEvent.latlng.lng.toFixed(6);
+
+      coordBar.textContent =
+        `Lat ${lat} · Lon ${lon} · Z${zoom}`;
+    }
+  });
 }
 
 
-// ============================================================
-// LOAD GEOJSON LAYER
-// ============================================================
+/* ============================================================
+   HTML ESCAPING
+   ============================================================ */
+
+function escapeHTML(value) {
+
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+
+/* ============================================================
+   LOAD GEOJSON LAYER
+   ============================================================ */
 
 async function loadLayer(key) {
 
   const cfg = LAYERS_CONFIG[key];
 
   if (!cfg) {
-    console.warn(`Layer configuration not found: ${key}`);
-    return;
+    console.warn(`Unknown layer: ${key}`);
+    return null;
   }
 
   try {
@@ -271,14 +329,17 @@ async function loadLayer(key) {
           cfg
         );
       }
-
     });
 
     layers[key] = layer;
 
     layer.addTo(map);
 
-    console.log(`Loaded layer: ${cfg.label}`);
+    console.log(
+      `Loaded layer: ${cfg.label}`
+    );
+
+    updateFeatureCount();
 
     return layer;
 
@@ -291,14 +352,16 @@ async function loadLayer(key) {
 
     layers[key] = null;
 
+    showLayerError(cfg);
+
     return null;
   }
 }
 
 
-// ============================================================
-// FEATURE EVENTS
-// ============================================================
+/* ============================================================
+   FEATURE EVENTS
+   ============================================================ */
 
 function setupFeatureEvents(
   key,
@@ -307,28 +370,31 @@ function setupFeatureEvents(
   cfg
 ) {
 
-  // ----------------------------------------------------------
-  // CLICK
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     CLICK
+     ---------------------------------------------------------- */
 
   leafletLayer.on('click', function () {
 
     showFeatureInfo(
       key,
       feature,
-      cfg
+      cfg,
+      leafletLayer
     );
   });
 
 
-  // ----------------------------------------------------------
-  // MOUSEOVER
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     MOUSEOVER
+     ---------------------------------------------------------- */
 
   leafletLayer.on('mouseover', function () {
 
     this.setStyle({
+
       weight: cfg.weight + 1.5,
+
       fillOpacity: Math.min(
         cfg.fillOpacity * currentOpacity + 0.2,
         0.9
@@ -341,9 +407,9 @@ function setupFeatureEvents(
   });
 
 
-  // ----------------------------------------------------------
-  // MOUSEOUT
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     MOUSEOUT
+     ---------------------------------------------------------- */
 
   leafletLayer.on('mouseout', function () {
 
@@ -353,14 +419,14 @@ function setupFeatureEvents(
   });
 
 
-  // ----------------------------------------------------------
-  // TOOLTIP
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     TOOLTIP
+     ---------------------------------------------------------- */
 
   if (
     feature &&
     feature.properties &&
-    Object.keys(feature.properties).length > 0
+    Object.keys(feature.properties).length
   ) {
 
     const properties = feature.properties;
@@ -375,19 +441,19 @@ function setupFeatureEvents(
     leafletLayer.bindTooltip(
 
       `
-        <div
-          style="
-            font-family:'Space Mono',monospace;
-            font-size:10px;
-            background:#1a1208;
-            color:#c8932a;
-            padding:4px 8px;
-            border-radius:4px;
-            border:1px solid rgba(200,147,42,0.3);
-          "
-        >
-          ${escapeHTML(String(name))}
-        </div>
+      <div
+        style="
+          font-family:'Space Mono',monospace;
+          font-size:10px;
+          background:#1a1208;
+          color:#c8932a;
+          padding:4px 8px;
+          border-radius:4px;
+          border:1px solid rgba(200,147,42,0.3);
+        "
+      >
+        ${escapeHTML(name)}
+      </div>
       `,
 
       {
@@ -400,61 +466,61 @@ function setupFeatureEvents(
 }
 
 
-// ============================================================
-// FEATURE INFORMATION
-// ============================================================
+/* ============================================================
+   FEATURE INFORMATION
+   ============================================================ */
 
 function showFeatureInfo(
   key,
   feature,
-  cfg
+  cfg,
+  leafletLayer
 ) {
 
   const properties =
     feature.properties || {};
 
-  let html =
-    `<h3>${escapeHTML(cfg.label)}</h3>`;
-
-  const ignoredProperties =
-    new Set([
-      'geometry',
-      'type'
-    ]);
-
   const entries =
     Object.entries(properties)
-      .filter(
-        ([propertyName]) =>
-          !ignoredProperties.has(propertyName)
-      );
+      .filter(([propertyName]) => {
+
+        return ![
+          'geometry',
+          'type'
+        ].includes(propertyName);
+
+      });
 
 
-  // ----------------------------------------------------------
-  // POPUP CONTENT
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     POPUP
+     ---------------------------------------------------------- */
 
-  if (entries.length === 0) {
+  let popupHTML =
+    `<div class="custom-popup">`;
 
-    html += `
-      <p
-        style="
-          color:#a89060;
-          font-size:11px;
-        "
-      >
+  popupHTML +=
+    `<h3>${escapeHTML(cfg.label)}</h3>`;
+
+  if (!entries.length) {
+
+    popupHTML += `
+      <p style="
+        color:#a89060;
+        font-size:11px;
+      ">
         No attributes available.
       </p>
     `;
 
   } else {
 
-    html += '<table>';
+    popupHTML += '<table>';
 
     entries.forEach(
       ([propertyName, value]) => {
 
-        html += `
+        popupHTML += `
           <tr>
             <td>
               ${escapeHTML(propertyName)}
@@ -472,16 +538,32 @@ function showFeatureInfo(
       }
     );
 
-    html += '</table>';
+    popupHTML += '</table>';
+  }
+
+  popupHTML += '</div>';
+
+
+  /* ----------------------------------------------------------
+     OPEN LEAFLET POPUP
+     ---------------------------------------------------------- */
+
+  if (leafletLayer) {
+
+    leafletLayer
+      .bindPopup(popupHTML)
+      .openPopup();
   }
 
 
-  // ----------------------------------------------------------
-  // UPDATE SIDEBAR
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     SIDEBAR INFO
+     ---------------------------------------------------------- */
 
   const panel =
-    document.getElementById('feature-info');
+    document.getElementById(
+      'feature-info'
+    );
 
   if (panel) {
 
@@ -515,63 +597,35 @@ function showFeatureInfo(
                 : String(value)
             )}
           </div>
-
         `;
       }
     );
 
-    panel.innerHTML = sidebarHTML;
+    panel.innerHTML =
+      sidebarHTML;
   }
 
 
-  // ----------------------------------------------------------
-  // OPEN INFO TAB
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     SWITCH TO INFO TAB
+     ---------------------------------------------------------- */
 
-  const infoButton =
-    document.querySelectorAll(
-      '.tab-btn'
-    )[3];
+  const buttons =
+    document.querySelectorAll('.tab-btn');
 
-  switchTab(
-    'info',
-    infoButton
-  );
+  if (buttons.length >= 4) {
 
-
-  // ----------------------------------------------------------
-  // LEAFLET POPUP
-  // ----------------------------------------------------------
-
-  if (
-    feature.geometry &&
-    map
-  ) {
-
-    const popupContent =
-      `<div class="custom-popup">${html}</div>`;
-
-    // Find the clicked feature's layer and open
-    // the popup through the current map interaction.
-    map.eachLayer(function (mapLayer) {
-
-      if (
-        mapLayer &&
-        mapLayer.feature === feature
-      ) {
-
-        mapLayer
-          .bindPopup(popupContent)
-          .openPopup();
-      }
-    });
+    switchTab(
+      'info',
+      buttons[3]
+    );
   }
 }
 
 
-// ============================================================
-// TAB SWITCHING
-// ============================================================
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
 
 function switchTab(
   name,
@@ -609,20 +663,36 @@ function switchTab(
   }
 
 
-  // Ensure Leaflet recalculates map dimensions
+  /*
+   * Chart.js sometimes needs a resize after
+   * its parent becomes visible.
+   */
+
   setTimeout(function () {
 
     if (map) {
       map.invalidateSize();
     }
 
+    if (ndviChartInstance) {
+      ndviChartInstance.resize();
+    }
+
+    if (ndviBarInstance) {
+      ndviBarInstance.resize();
+    }
+
+    if (landUseChartInstance) {
+      landUseChartInstance.resize();
+    }
+
   }, 100);
 }
 
 
-// ============================================================
-// TOGGLE MAP LAYER
-// ============================================================
+/* ============================================================
+   TOGGLE LAYER
+   ============================================================ */
 
 function toggleLayer(
   key,
@@ -679,9 +749,9 @@ function toggleLayer(
 }
 
 
-// ============================================================
-// BASEMAP SWITCHER
-// ============================================================
+/* ============================================================
+   BASEMAP SWITCHER
+   ============================================================ */
 
 function setBasemap(
   name,
@@ -702,7 +772,9 @@ function setBasemap(
     .querySelectorAll('.bm-btn')
     .forEach(function (btn) {
 
-      btn.classList.remove('active');
+      btn.classList.remove(
+        'active'
+      );
     });
 
 
@@ -719,7 +791,9 @@ function setBasemap(
         map.hasLayer(basemap)
       ) {
 
-        map.removeLayer(basemap);
+        map.removeLayer(
+          basemap
+        );
       }
     });
 
@@ -728,16 +802,20 @@ function setBasemap(
 
   activeBasemap = name;
 
-  // Refresh tiles
-  map.setZoom(
-    map.getZoom()
-  );
+
+  setTimeout(function () {
+
+    if (map) {
+      map.invalidateSize();
+    }
+
+  }, 100);
 }
 
 
-// ============================================================
-// LAND PARCEL OPACITY
-// ============================================================
+/* ============================================================
+   OPACITY CONTROL
+   ============================================================ */
 
 function setOpacity(value) {
 
@@ -750,7 +828,6 @@ function setOpacity(value) {
       'opacity-val'
     );
 
-
   if (opacityValue) {
 
     opacityValue.textContent =
@@ -758,45 +835,31 @@ function setOpacity(value) {
   }
 
 
-  const landKeys = [
-    'land1ab',
-    'land1',
-    'land2',
-    'land3',
-    'land4',
-    'land5',
-    'land6',
-    'land7',
-    'land8',
-    'land9'
-  ];
+  LAND_KEYS.forEach(
+    function (key) {
 
+      const layer =
+        layers[key];
 
-  landKeys.forEach(function (key) {
+      if (!layer) return;
 
-    const layer =
-      layers[key];
+      const cfg =
+        LAYERS_CONFIG[key];
 
-    if (!layer) return;
+      layer.setStyle({
 
-
-    const cfg =
-      LAYERS_CONFIG[key];
-
-
-    layer.setStyle({
-
-      fillOpacity:
-        cfg.fillOpacity *
-        currentOpacity
-    });
-  });
+        fillOpacity:
+          cfg.fillOpacity *
+          currentOpacity
+      });
+    }
+  );
 }
 
 
-// ============================================================
-// AUTO FIT ALL LAYERS
-// ============================================================
+/* ============================================================
+   AUTO FIT ALL LAYERS
+   ============================================================ */
 
 function fitMapToLayers() {
 
@@ -843,33 +906,142 @@ function fitMapToLayers() {
 }
 
 
-// ============================================================
-// BUILD CHARTS
-// ============================================================
+/* ============================================================
+   FEATURE COUNT
+   ============================================================ */
 
-function buildCharts() {
+function updateFeatureCount() {
 
-  if (
-    typeof Chart === 'undefined'
-  ) {
+  let total =
+    0;
 
-    console.error(
-      'Chart.js is not loaded.'
+  Object.values(layers)
+    .forEach(function (layer) {
+
+      if (!layer) return;
+
+      layer.eachLayer(
+        function () {
+          total++;
+        }
+      );
+    });
+
+
+  const totalElement =
+    document.getElementById(
+      'stat-total'
     );
 
-    return;
+  if (totalElement) {
+
+    totalElement.textContent =
+      total.toLocaleString();
   }
 
 
-  buildNDVIChart();
-  buildNDVIBarChart();
-  buildLandUseChart();
+  const badge =
+    document.querySelector(
+      '.season-badge'
+    );
+
+  if (badge && total > 0) {
+
+    badge.title =
+      `${total} mapped features`;
+  }
 }
 
 
-// ============================================================
-// NDVI PHENOLOGICAL CURVE
-// ============================================================
+/* ============================================================
+   LAYER ERROR MESSAGE
+   ============================================================ */
+
+function showLayerError(cfg) {
+
+  const info =
+    document.getElementById(
+      'feature-info'
+    );
+
+  if (!info) return;
+
+  /*
+   * Do not replace the initial information panel
+   * for every missing file. Errors are logged to console.
+   */
+}
+
+
+/* ============================================================
+   NDVI CHART HELPERS
+   ============================================================ */
+
+function chartCommonOptions() {
+
+  return {
+
+    responsive: true,
+
+    maintainAspectRatio: false,
+
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+
+    plugins: {
+
+      legend: {
+
+        labels: {
+
+          color: '#a89060',
+
+          font: {
+            family: 'Space Mono',
+            size: 9
+          },
+
+          boxWidth: 12,
+          padding: 8
+        }
+      },
+
+      tooltip: {
+
+        backgroundColor:
+          'rgba(26,18,8,0.95)',
+
+        titleColor:
+          '#c8932a',
+
+        bodyColor:
+          '#f0e8d0',
+
+        borderColor:
+          'rgba(200,147,42,0.3)',
+
+        borderWidth: 1,
+
+        titleFont: {
+          family: 'Space Mono',
+          size: 10
+        },
+
+        bodyFont: {
+          family: 'Space Mono',
+          size: 10
+        }
+      }
+    }
+  };
+}
+
+
+/* ============================================================
+   NDVI PHENOLOGICAL CURVE
+   ============================================================ */
 
 function buildNDVIChart() {
 
@@ -930,7 +1102,8 @@ function buildNDVIChart() {
               0.21
             ],
 
-            borderColor: '#c8932a',
+            borderColor:
+              '#c8932a',
 
             backgroundColor:
               'rgba(200,147,42,0.12)',
@@ -946,7 +1119,6 @@ function buildNDVIChart() {
             pointBackgroundColor:
               '#c8932a'
           },
-
 
           {
             label: 'Maize',
@@ -966,7 +1138,8 @@ function buildNDVIChart() {
               0.18
             ],
 
-            borderColor: '#6db85c',
+            borderColor:
+              '#6db85c',
 
             backgroundColor:
               'rgba(109,184,92,0.10)',
@@ -982,7 +1155,6 @@ function buildNDVIChart() {
             pointBackgroundColor:
               '#6db85c'
           },
-
 
           {
             label: 'Pasture',
@@ -1002,7 +1174,8 @@ function buildNDVIChart() {
               0.28
             ],
 
-            borderColor: '#8bc34a',
+            borderColor:
+              '#8bc34a',
 
             backgroundColor:
               'rgba(139,195,74,0.08)',
@@ -1024,7 +1197,6 @@ function buildNDVIChart() {
             ]
           },
 
-
           {
             label: 'Woodland',
 
@@ -1043,7 +1215,8 @@ function buildNDVIChart() {
               0.55
             ],
 
-            borderColor: '#1e7a1e',
+            borderColor:
+              '#1e7a1e',
 
             backgroundColor:
               'rgba(30,122,30,0.08)',
@@ -1067,67 +1240,9 @@ function buildNDVIChart() {
         ]
       },
 
-
       options: {
 
-        responsive: true,
-
-        maintainAspectRatio: false,
-
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-
-
-        plugins: {
-
-          legend: {
-
-            labels: {
-
-              color: '#a89060',
-
-              font: {
-                family: 'Space Mono',
-                size: 9
-              },
-
-              boxWidth: 12,
-
-              padding: 8
-            }
-          },
-
-
-          tooltip: {
-
-            backgroundColor:
-              'rgba(26,18,8,0.95)',
-
-            titleColor:
-              '#c8932a',
-
-            bodyColor:
-              '#f0e8d0',
-
-            borderColor:
-              'rgba(200,147,42,0.3)',
-
-            borderWidth: 1,
-
-            titleFont: {
-              family: 'Space Mono',
-              size: 10
-            },
-
-            bodyFont: {
-              family: 'Space Mono',
-              size: 10
-            }
-          }
-        },
-
+        ...chartCommonOptions(),
 
         scales: {
 
@@ -1135,7 +1250,6 @@ function buildNDVIChart() {
 
             ticks: {
               color: '#a89060',
-
               font: {
                 family: 'Space Mono',
                 size: 9
@@ -1148,11 +1262,9 @@ function buildNDVIChart() {
             }
           },
 
-
           y: {
 
             min: 0,
-
             max: 1,
 
             ticks: {
@@ -1192,9 +1304,9 @@ function buildNDVIChart() {
 }
 
 
-// ============================================================
-// NDVI LAND BAR CHART
-// ============================================================
+/* ============================================================
+   NDVI BAR CHART
+   ============================================================ */
 
 function buildNDVIBarChart() {
 
@@ -1233,7 +1345,6 @@ function buildNDVIBarChart() {
         datasets: [
 
           {
-
             label: 'Mean NDVI',
 
             data: [
@@ -1269,47 +1380,18 @@ function buildNDVIBarChart() {
         ]
       },
 
-
       options: {
 
-        responsive: true,
-
-        maintainAspectRatio: false,
+        ...chartCommonOptions(),
 
         plugins: {
 
+          ...chartCommonOptions().plugins,
+
           legend: {
             display: false
-          },
-
-          tooltip: {
-
-            backgroundColor:
-              'rgba(26,18,8,0.95)',
-
-            titleColor:
-              '#c8932a',
-
-            bodyColor:
-              '#f0e8d0',
-
-            borderColor:
-              'rgba(200,147,42,0.3)',
-
-            borderWidth: 1,
-
-            titleFont: {
-              family: 'Space Mono',
-              size: 10
-            },
-
-            bodyFont: {
-              family: 'Space Mono',
-              size: 10
-            }
           }
         },
-
 
         scales: {
 
@@ -1330,11 +1412,9 @@ function buildNDVIBarChart() {
             }
           },
 
-
           y: {
 
             min: 0,
-
             max: 1,
 
             ticks: {
@@ -1361,9 +1441,9 @@ function buildNDVIBarChart() {
 }
 
 
-// ============================================================
-// LAND USE CHART
-// ============================================================
+/* ============================================================
+   LAND USE CHART
+   ============================================================ */
 
 function buildLandUseChart() {
 
@@ -1398,7 +1478,6 @@ function buildLandUseChart() {
         datasets: [
 
           {
-
             label: 'Area (ha)',
 
             data: [
@@ -1426,7 +1505,6 @@ function buildLandUseChart() {
         ]
       },
 
-
       options: {
 
         indexAxis: 'y',
@@ -1440,7 +1518,6 @@ function buildLandUseChart() {
           legend: {
             display: false
           },
-
 
           tooltip: {
 
@@ -1468,7 +1545,6 @@ function buildLandUseChart() {
               size: 10
             },
 
-
             callbacks: {
 
               label: function (context) {
@@ -1478,7 +1554,6 @@ function buildLandUseChart() {
             }
           }
         },
-
 
         scales: {
 
@@ -1500,7 +1575,6 @@ function buildLandUseChart() {
                 'rgba(200,147,42,0.08)'
             }
           },
-
 
           y: {
 
@@ -1524,9 +1598,72 @@ function buildLandUseChart() {
 }
 
 
-// ============================================================
-// LOADING SCREEN
-// ============================================================
+/* ============================================================
+   BUILD ALL CHARTS
+   ============================================================ */
+
+function buildCharts() {
+
+  if (typeof Chart === 'undefined') {
+
+    console.error(
+      'Chart.js is not loaded.'
+    );
+
+    return;
+  }
+
+  buildNDVIChart();
+
+  buildNDVIBarChart();
+
+  buildLandUseChart();
+}
+
+
+/* ============================================================
+   INITIALISE ALL GEOJSON
+   ============================================================ */
+
+async function loadAllLayers() {
+
+  const keys =
+    Object.keys(
+      LAYERS_CONFIG
+    );
+
+
+  const results =
+    await Promise.allSettled(
+
+      keys.map(
+        function (key) {
+          return loadLayer(key);
+        }
+      )
+    );
+
+
+  const successful =
+    results.filter(
+      result =>
+        result.status === 'fulfilled' &&
+        result.value
+    ).length;
+
+
+  console.log(
+    `Loaded ${successful}/${keys.length} map layers.`
+  );
+
+
+  return results;
+}
+
+
+/* ============================================================
+   LOADING SCREEN
+   ============================================================ */
 
 function hideLoader() {
 
@@ -1543,247 +1680,113 @@ function hideLoader() {
   );
 
 
-  setTimeout(function () {
+  setTimeout(
+    function () {
 
-    if (loader.parentNode) {
-      loader.remove();
-    }
-
-  }, 600);
-}
-
-
-// ============================================================
-// ERROR DISPLAY
-// ============================================================
-
-function showLoadingError(message) {
-
-  const loader =
-    document.getElementById(
-      'loader'
-    );
-
-  if (!loader) return;
-
-
-  const text =
-    loader.querySelector(
-      '.loading-text'
-    );
-
-  const sub =
-    loader.querySelector(
-      '.loading-sub'
-    );
-
-
-  if (text) {
-
-    text.textContent =
-      'Loading Error';
-  }
-
-
-  if (sub) {
-
-    sub.textContent =
-      message;
-  }
-}
-
-
-// ============================================================
-// HTML ESCAPING
-// ============================================================
-
-function escapeHTML(value) {
-
-  const div =
-    document.createElement(
-      'div'
-    );
-
-  div.textContent =
-    value == null
-      ? ''
-      : String(value);
-
-  return div.innerHTML;
-}
-
-
-// ============================================================
-// LAYER STATUS
-// ============================================================
-
-function getLoadedLayerCount() {
-
-  return Object.values(layers)
-    .filter(function (layer) {
-
-      return layer !== null;
-    })
-    .length;
-}
-
-
-// ============================================================
-// MAP REFRESH
-// ============================================================
-
-function refreshMap() {
-
-  if (!map) return;
-
-  map.invalidateSize();
-
-  Object.values(layers)
-    .forEach(function (layer) {
-
-      if (
-        layer &&
-        layer.redraw
-      ) {
-
-        layer.redraw();
+      if (loader.parentNode) {
+        loader.remove();
       }
-    });
+
+    },
+    600
+  );
 }
 
 
-// ============================================================
-// INITIALISE APPLICATION
-// ============================================================
+/* ============================================================
+   APPLICATION BOOT
+   ============================================================ */
 
 async function init() {
 
-  try {
-
-    console.log(
-      'Starting KRB Agricultural Observatory...'
-    );
+  console.log(
+    'Starting KRB Agricultural Observatory...'
+  );
 
 
-    // --------------------------------------------------------
-    // MAP
-    // --------------------------------------------------------
+  /* Initialise map first */
 
-    initializeMap();
+  initializeMap();
 
 
-    // --------------------------------------------------------
-    // CHARTS
-    // --------------------------------------------------------
+  /* Build charts */
 
-    buildCharts();
+  buildCharts();
 
 
-    // --------------------------------------------------------
-    // LOAD ALL GEOJSON
-    // --------------------------------------------------------
+  /* Load GeoJSON */
 
-    const keys =
-      Object.keys(
-        LAYERS_CONFIG
-      );
+  await loadAllLayers();
 
 
-    await Promise.allSettled(
+  /* Fit to available data */
 
-      keys.map(function (key) {
-
-        return loadLayer(key);
-      })
-    );
+  fitMapToLayers();
 
 
-    // --------------------------------------------------------
-    // AUTO FIT
-    // --------------------------------------------------------
+  /* Update statistics */
 
-    fitMapToLayers();
+  updateFeatureCount();
 
 
-    // --------------------------------------------------------
-    // REPORT
-    // --------------------------------------------------------
+  /* Hide loading screen */
 
-    console.log(
-      `KRB Observatory ready. ${getLoadedLayerCount()}/${keys.length} layers loaded.`
-    );
-
-
-    // --------------------------------------------------------
-    // HIDE LOADING SCREEN
-    // --------------------------------------------------------
-
-    setTimeout(
-      hideLoader,
-      800
-    );
+  setTimeout(
+    hideLoader,
+    500
+  );
 
 
-  } catch (error) {
-
-    console.error(
-      'Application initialization failed:',
-      error
-    );
-
-
-    showLoadingError(
-      'Unable to initialise observatory'
-    );
-  }
+  console.log(
+    'KRB Agricultural Observatory ready.'
+  );
 }
 
 
-// ============================================================
-// WINDOW EVENTS
-// ============================================================
+/* ============================================================
+   GLOBAL EVENT HANDLERS
+   ============================================================ */
 
-window.addEventListener(
-  'resize',
+document.addEventListener(
+  'DOMContentLoaded',
   function () {
 
-    if (map) {
-      map.invalidateSize();
-    }
-
+    init();
   }
 );
 
 
-// ============================================================
-// START APPLICATION
-// ============================================================
+/* ============================================================
+   EXPOSE FUNCTIONS
+   ============================================================
 
-if (
-  document.readyState === 'loading'
-) {
+   Your existing HTML uses inline onclick handlers, e.g.
 
-  document.addEventListener(
-    'DOMContentLoaded',
-    init
-  );
+   onclick="switchTab('layers',this)"
+   onclick="toggleLayer('dams',this)"
+   onclick="setBasemap('satellite',this)"
+   onclick="setOpacity(this.value)"
 
-} else {
+   Functions declared at top-level are normally available
+   to inline handlers, but explicitly exposing them makes
+   the behaviour reliable even if this file is later changed
+   to a module.
+   ============================================================ */
 
-  init();
-}
+window.switchTab =
+  switchTab;
 
+window.toggleLayer =
+  toggleLayer;
 
-// ============================================================
-// OPTIONAL GLOBAL API
-// These functions remain available to your HTML onclick
-// attributes.
-// ============================================================
+window.setBasemap =
+  setBasemap;
 
-window.switchTab = switchTab;
-window.toggleLayer = toggleLayer;
-window.setBasemap = setBasemap;
-window.setOpacity = setOpacity;
-window.showFeatureInfo = showFeatureInfo;
-window.fitMapToLayers = fitMapToLayers;
-window.refreshMap = refreshMap;
+window.setOpacity =
+  setOpacity;
+
+window.fitMapToLayers =
+  fitMapToLayers;
+
+window.showFeatureInfo =
+  showFeatureInfo;
