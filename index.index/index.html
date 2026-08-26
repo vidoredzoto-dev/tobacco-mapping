@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KRB · Kutsaga Agricultural Observatory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  :root {
+    --soil-dark:   #1a1208;
+    --soil-mid:    #2d1f0a;
+    --soil-warm:   #3d2b0f;
+    --tobacco-gold:#c8932a;
+    --leaf-green:  #4a7c3f;
+    --leaf-bright: #6db85c;
+    --ndvi-low:    #d4691e;
+    --ndvi-mid:    #e8c44a;
+    --ndvi-high:   #5aad3f;
+    --ndvi-peak:   #1e7a1e;
+    --water-blue:  #3a7ebf;
+    --road-cream:  #d4c49a;
+    --panel-bg:    rgba(26,18,8,0.92);
+    --panel-border:rgba(200,147,42,0.3);
+    --text-primary:#f0e8d0;
+    --text-muted:  #a89060;
+    --accent:      #c8932a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--soil-dark);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 56px;
+    background: var(--soil-mid);
+    border-bottom: 1px solid var(--panel-border);
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--tobacco-gold), var(--leaf-green));
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    color: var(--soil-dark);
+    letter-spacing: -1px;
+  }
+  .logo-text h1 {
+    font-size: 14px; font-weight: 600; letter-spacing: 0.05em;
+    color: var(--text-primary);
+  }
+  .logo-text p {
+    font-size: 10px; color: var(--text-muted);
+    font-family: 'Space Mono', monospace; letter-spacing: 0.08em;
+  }
+  .header-right {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .season-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; padding: 4px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 20px; color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--leaf-bright);
+    box-shadow: 0 0 8px var(--leaf-bright);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 12px 8px;
+    background: none; border: none;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px; letter-spacing: 0.12em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-btn:hover { color: var(--text-primary); }
+
+  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+  .tab-content.active { display: flex; flex-direction: column; gap: 12px; }
+
+  /* scrollbar */
+  .tab-content::-webkit-scrollbar { width: 4px; }
+  .tab-content::-webkit-scrollbar-track { background: transparent; }
+  .tab-content::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+  /* ── LAYER CONTROLS ── */
+  .layer-group { }
+  .layer-group-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px; letter-spacing: 0.15em;
+    color: var(--text-muted); text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .layer-group-label::after {
+    content: ''; flex: 1;
+    height: 1px; background: var(--panel-border);
+  }
+
+  .layer-item {
+    display: flex; align-items: center;
+    gap: 10px; padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 4px;
+  }
+  .layer-item:hover { background: rgba(200,147,42,0.08); border-color: var(--panel-border); }
+  .layer-item.active-layer { background: rgba(200,147,42,0.12); border-color: rgba(200,147,42,0.4); }
+
+  .layer-swatch {
+    width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  }
+  .layer-name {
+    flex: 1; font-size: 12px; color: var(--text-primary);
+  }
+  .layer-toggle {
+    width: 28px; height: 16px;
+    background: var(--soil-warm);
+    border-radius: 8px; position: relative;
+    cursor: pointer; border: 1px solid var(--panel-border);
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .layer-toggle.on { background: var(--leaf-green); border-color: var(--leaf-bright); }
+  .layer-toggle::after {
+    content: '';
+    position: absolute; top: 1px; left: 1px;
+    width: 12px; height: 12px;
+    border-radius: 50%; background: white;
+    transition: transform 0.2s;
+  }
+  .layer-toggle.on::after { transform: translateX(12px); }
+
+  /* ── NDVI LEGEND ── */
+  .ndvi-legend {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+  }
+  .ndvi-legend-bar {
+    height: 20px;
+    background: linear-gradient(to right,
+      #d4691e 0%, #d4691e 15%,
+      #e8c44a 30%, #9fc94a 50%,
+      #5aad3f 70%, #1e7a1e 100%
+    );
+  }
+  .ndvi-legend-labels {
+    display: flex; justify-content: space-between;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.3);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+  }
+  .ndvi-label { text-align: center; }
+
+  /* ── AGRI COLOUR INDEX ── */
+  .agri-index { display: flex; flex-direction: column; gap: 6px; }
+  .agri-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+  }
+  .agri-swatch {
+    width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0;
+  }
+  .agri-info { flex: 1; }
+  .agri-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+  .agri-desc { font-size: 10px; color: var(--text-muted); font-family: 'Space Mono', monospace; }
+
+  /* ── PHENOLOGICAL CHART ── */
+  .chart-wrap {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+    background: rgba(0,0,0,0.3);
+    padding: 12px;
+  }
+  .chart-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em;
+    color: var(--accent); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px; font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-unit {
+    font-size: 10px; color: var(--text-muted);
+  }
+  .stat-label {
+    font-size: 10px; color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* ── POPUP INFO ── */
+  .info-panel {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .info-panel.has-data {
+    text-align: left;
+    color: var(--text-primary);
+  }
+  .info-key {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .info-val { font-size: 13px; margin-bottom: 8px; }
+
+  /* ── MAP ── */
+  #map {
+    flex: 1;
+    background: var(--soil-dark);
+  }
+
+  /* Leaflet custom styles */
+  .leaflet-control-zoom {
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 6px !important;
+    overflow: hidden;
+  }
+  .leaflet-control-zoom a {
+    background: var(--panel-bg) !important;
+    color: var(--accent) !important;
+    border-color: var(--panel-border) !important;
+    font-size: 16px !important;
+  }
+  .leaflet-control-zoom a:hover { background: var(--soil-warm) !important; }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--soil-mid) !important;
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  }
+  .leaflet-popup-tip { background: var(--soil-mid) !important; }
+  .leaflet-popup-content { font-family: 'Space Grotesk', sans-serif !important; }
+
+  /* custom popup */
+  .custom-popup h3 {
+    font-size: 12px; font-family: 'Space Mono', monospace;
+    color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 8px;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+  }
+  .custom-popup table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .custom-popup td { padding: 3px 0; }
+  .custom-popup td:first-child { color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 10px; padding-right: 12px; }
+
+  /* ── BASEMAP SWITCHER ── */
+  .basemap-switcher {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .bm-btn {
+    flex: 1;
+    padding: 8px 6px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px; letter-spacing: 0.08em;
+    cursor: pointer; text-align: center;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .bm-btn:hover, .bm-btn.active { background: rgba(200,147,42,0.15); color: var(--accent); border-color: var(--accent); }
+
+  /* ── OPACITY SLIDER ── */
+  .opacity-control { display: flex; flex-direction: column; gap: 6px; }
+  .opacity-label {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+  }
+  input[type=range] {
+    width: 100%; accent-color: var(--accent);
+    height: 4px;
+  }
+
+  /* ── LOADING ── */
+  .loading-overlay {
+    position: absolute; inset: 0;
+    background: var(--soil-dark);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 9999;
+    gap: 20px;
+    transition: opacity 0.5s;
+  }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-ring {
+    width: 60px; height: 60px;
+    border: 3px solid var(--panel-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px; letter-spacing: 0.15em;
+    color: var(--text-muted); text-transform: uppercase;
+  }
+  .loading-sub { font-size: 9px; color: var(--soil-warm); }
+
+  /* ── NDVI OVERLAY LEGEND (map) ── */
+  .map-legend {
+    position: absolute;
+    bottom: 30px; right: 10px;
+    z-index: 999;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(10px);
+    min-width: 160px;
+  }
+  .map-legend-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px; letter-spacing: 0.12em;
+    color: var(--accent); text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .map-legend-bar {
+    height: 12px; border-radius: 3px;
+    background: linear-gradient(to right, #d4691e, #e8c44a, #9fc94a, #1e7a1e);
+    margin-bottom: 4px;
+  }
+  .map-legend-ticks {
+    display: flex; justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+  }
+
+  /* ── COORDINATE DISPLAY ── */
+  .coord-display {
+    position: absolute;
+    bottom: 30px; left: 330px;
+    z-index: 999;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; color: var(--text-muted);
+    backdrop-filter: blur(10px);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── AREA ANNOTATION ── */
+  .area-tag {
+    background: rgba(200,147,42,0.9);
+    color: var(--soil-dark);
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700;
+    font-family: 'Space Mono', monospace;
+    white-space: nowrap;
+    border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div class="loading-overlay" id="loader">
+  <div class="loading-ring"></div>
+  <div>
+    <div class="loading-text">Loading Observatory</div>
+    <div class="loading-sub">KRB · Kutsaga Research Board</div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">KRB</div>
+    <div class="logo-text">
+      <h1>Kutsaga Agricultural Observatory</h1>
+      <p>Agricultural Data Science, Statistics & Engineering</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="season-badge">Season 2025/26</span>
+    <div class="live-dot" title="Live Data"></div>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" onclick="switchTab('layers',this)">Layers</button>
+      <button class="tab-btn" onclick="switchTab('ndvi',this)">NDVI</button>
+      <button class="tab-btn" onclick="switchTab('agri',this)">Agri</button>
+      <button class="tab-btn" onclick="switchTab('info',this)">Info</button>
+    </div>
+
+    <!-- LAYERS TAB -->
+    <div class="tab-content active" id="tab-layers">
+      <div class="layer-group">
+        <div class="layer-group-label">Basemap</div>
+        <div class="basemap-switcher">
+          <button class="bm-btn active" onclick="setBasemap('satellite',this)">Satellite</button>
+          <button class="bm-btn" onclick="setBasemap('topo',this)">Topo</button>
+          <button class="bm-btn" onclick="setBasemap('dark',this)">Dark</button>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-label">Infrastructure</div>
+        <div id="layer-dams" class="layer-item active-layer" onclick="toggleLayer('dams',this)">
+          <div class="layer-swatch" style="background:#3a7ebf"></div>
+          <span class="layer-name">Dams & Water</span>
+          <div class="layer-toggle on" id="toggle-dams"></div>
+        </div>
+        <div id="layer-rivers" class="layer-item active-layer" onclick="toggleLayer('rivers',this)">
+          <div class="layer-swatch" style="background:#5ba3d4"></div>
+          <span class="layer-name">Rivers</span>
+          <div class="layer-toggle on" id="toggle-rivers"></div>
+        </div>
+        <div id="layer-roads" class="layer-item active-layer" onclick="toggleLayer('roads',this)">
+          <div class="layer-swatch" style="background:#d4c49a"></div>
+          <span class="layer-name">Roads</span>
+          <div class="layer-toggle on" id="toggle-roads"></div>
+        </div>
+        <div id="layer-station" class="layer-item active-layer" onclick="toggleLayer('station',this)">
+          <div class="layer-swatch" style="background:#c8932a"></div>
+          <span class="layer-name">Research Station</span>
+          <div class="layer-toggle on" id="toggle-station"></div>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-label">Land Parcels</div>
+        <div id="layer-land1ab" class="layer-item active-layer" onclick="toggleLayer('land1ab',this)">
+          <div class="layer-swatch" style="background:#c8932a"></div>
+          <span class="layer-name">Land 1ab (Tobacco)</span>
+          <div class="layer-toggle on" id="toggle-land1ab"></div>
+        </div>
+        <div id="layer-land1" class="layer-item active-layer" onclick="toggleLayer('land1',this)">
+          <div class="layer-swatch" style="background:#a67c2e"></div>
+          <span class="layer-name">Land 1</span>
+          <div class="layer-toggle on" id="toggle-land1"></div>
+        </div>
+        <div id="layer-land2" class="layer-item active-layer" onclick="toggleLayer('land2',this)">
+          <div class="layer-swatch" style="background:#6db85c"></div>
+          <span class="layer-name">Land 2</span>
+          <div class="layer-toggle on" id="toggle-land2"></div>
+        </div>
+        <div id="layer-land3" class="layer-item active-layer" onclick="toggleLayer('land3',this)">
+          <div class="layer-swatch" style="background:#4a7c3f"></div>
+          <span class="layer-name">Land 3</span>
+          <div class="layer-toggle on" id="toggle-land3"></div>
+        </div>
+        <div id="layer-land4" class="layer-item active-layer" onclick="toggleLayer('land4',this)">
+          <div class="layer-swatch" style="background:#8bc34a"></div>
+          <span class="layer-name">Land 4</span>
+          <div class="layer-toggle on" id="toggle-land4"></div>
+        </div>
+        <div id="layer-land5" class="layer-item active-layer" onclick="toggleLayer('land5',this)">
+          <div class="layer-swatch" style="background:#cddc39"></div>
+          <span class="layer-name">Land 5</span>
+          <div class="layer-toggle on" id="toggle-land5"></div>
+        </div>
+        <div id="layer-land6" class="layer-item active-layer" onclick="toggleLayer('land6',this)">
+          <div class="layer-swatch" style="background:#9e9d24"></div>
+          <span class="layer-name">Land 6</span>
+          <div class="layer-toggle on" id="toggle-land6"></div>
+        </div>
+        <div id="layer-land7" class="layer-item active-layer" onclick="toggleLayer('land7',this)">
+          <div class="layer-swatch" style="background:#f9a825"></div>
+          <span class="layer-name">Land 7</span>
+          <div class="layer-toggle on" id="toggle-land7"></div>
+        </div>
+        <div id="layer-land8" class="layer-item active-layer" onclick="toggleLayer('land8',this)">
+          <div class="layer-swatch" style="background:#e57c0f"></div>
+          <span class="layer-name">Land 8</span>
+          <div class="layer-toggle on" id="toggle-land8"></div>
+        </div>
+        <div id="layer-land9" class="layer-item active-layer" onclick="toggleLayer('land9',this)">
+          <div class="layer-swatch" style="background:#d84315"></div>
+          <span class="layer-name">Land 9</span>
+          <div class="layer-toggle on" id="toggle-land9"></div>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-label">Layer Opacity</div>
+        <div class="opacity-control">
+          <div class="opacity-label"><span>Land Parcels</span><span id="opacity-val">80%</span></div>
+          <input type="range" min="0" max="100" value="80" oninput="setOpacity(this.value)"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- NDVI TAB -->
+    <div class="tab-content" id="tab-ndvi">
+      <div class="layer-group-label" style="margin-bottom:0">NDVI Classification</div>
+
+      <div class="ndvi-legend">
+        <div class="ndvi-legend-bar"></div>
+        <div class="ndvi-legend-labels">
+          <div class="ndvi-label">−1<br/><span style="color:#d4691e">Bare</span></div>
+          <div class="ndvi-label">0<br/><span style="color:#e8c44a">Sparse</span></div>
+          <div class="ndvi-label">0.4<br/><span style="color:#9fc94a">Moderate</span></div>
+          <div class="ndvi-label">1<br/><span style="color:#1e7a1e">Dense</span></div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Phenological NDVI Curves — 2025/26</div>
+        <canvas id="ndviChart" height="220"></canvas>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-val">0.73</div>
+          <div class="stat-label">Peak NDVI<br/>Feb 2026</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">0.21</div>
+          <div class="stat-label">Min NDVI<br/>Aug 2025</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">0.48</div>
+          <div class="stat-label">Mean NDVI<br/>Season Avg</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">+0.12</div>
+          <div class="stat-label">ΔYear on<br/>Year</div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Land Cover NDVI Distribution</div>
+        <canvas id="ndviBar" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- AGRI TAB -->
+    <div class="tab-content" id="tab-agri">
+      <div class="layer-group-label" style="margin-bottom:0">Agricultural Colour Index</div>
+
+      <div class="agri-index">
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#c8932a,#a67c2e)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Tobacco — Burley</div>
+            <div class="agri-desc">NDVI 0.55–0.73</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#6db85c,#4a7c3f)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Maize / Cereals</div>
+            <div class="agri-desc">NDVI 0.60–0.80</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#8bc34a,#558b2f)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Pasture / Grassland</div>
+            <div class="agri-desc">NDVI 0.35–0.55</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#cddc39,#9e9d24)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Bare / Fallow</div>
+            <div class="agri-desc">NDVI 0.10–0.30</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#3a7ebf,#1a4e8a)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Water Bodies</div>
+            <div class="agri-desc">NDWI &gt; 0.2</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#d84315,#b71c1c)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Bare Soil / Erosion</div>
+            <div class="agri-desc">NDVI &lt; 0.15</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#1e7a1e,#0a4a0a)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Woodland / Bush</div>
+            <div class="agri-desc">NDVI 0.65–0.85</div>
+          </div>
+        </div>
+        <div class="agri-row">
+          <div class="agri-swatch" style="background:linear-gradient(135deg,#f9a825,#e65100)"></div>
+          <div class="agri-info">
+            <div class="agri-name">Crop Stress</div>
+            <div class="agri-desc">NDVI decline &gt;20%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-wrap" style="margin-top:4px">
+        <div class="chart-title">Land Use Distribution (ha)</div>
+        <canvas id="landUseChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- INFO TAB -->
+    <div class="tab-content" id="tab-info">
+      <div class="layer-group-label" style="margin-bottom:0">Feature Information</div>
+      <div class="info-panel" id="feature-info">
+        Click any feature on the map to inspect its properties.
+      </div>
+
+      <div class="layer-group-label">About this Map</div>
+      <div class="info-panel has-data" style="text-align:left">
+        <div class="info-key">Organisation</div>
+        <div class="info-val">Kutsaga Research Board — ADSE</div>
+        <div class="info-key">Affiliation</div>
+        <div class="info-val">Ministry of Lands, Agriculture & Rural Resettlement</div>
+        <div class="info-key">Season</div>
+        <div class="info-val">2025 / 2026</div>
+        <div class="info-key">Imagery</div>
+        <div class="info-val">Sentinel-2 MSI (10m)</div>
+        <div class="info-key">Classification</div>
+        <div class="info-val">Random Forest — GEE</div>
+        <div class="info-key">CRS</div>
+        <div class="info-val">WGS84 / EPSG:4326</div>
+      </div>
+
+      <div class="layer-group-label">Coordinates</div>
+      <div class="info-panel has-data" id="coord-info">
+        Hover over the map to see coordinates.
+      </div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+  <div class="map-legend">
+    <div class="map-legend-title">NDVI Index</div>
+    <div class="map-legend-bar"></div>
+    <div class="map-legend-ticks">
+      <span>−1</span><span>0</span><span>0.5</span><span>1</span>
+    </div>
+  </div>
+  <div class="coord-display" id="coord-bar">Lat — · Lon —</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const LAYERS_CONFIG = {
+  dams:    { file:'dams.geojson',                  color:'#3a7ebf', weight:2, fillOpacity:0.5, label:'Dams & Water' },
+  rivers:  { file:'rivers.geojson',                color:'#5ba3d4', weight:2, fillOpacity:0.4, label:'Rivers' },
+  roads:   { file:'roads.geojson',                 color:'#d4c49a', weight:2.5, fillOpacity:0, label:'Roads' },
+  station: { file:'Kutsagaresearchstation.geojson', color:'#c8932a', weight:2, fillOpacity:0.25, label:'Research Station' },
+  land1ab: { file:'land1ab.geojson',               color:'#c8932a', weight:1.5, fillOpacity:0.5, label:'Land 1ab' },
+  land1:   { file:'land1.geojson',                 color:'#a67c2e', weight:1.5, fillOpacity:0.5, label:'Land 1' },
+  land2:   { file:'land2.geojson',                 color:'#6db85c', weight:1.5, fillOpacity:0.5, label:'Land 2' },
+  land3:   { file:'land3.geojson',                 color:'#4a7c3f', weight:1.5, fillOpacity:0.5, label:'Land 3' },
+  land4:   { file:'land4.geojson',                 color:'#8bc34a', weight:1.5, fillOpacity:0.5, label:'Land 4' },
+  land5:   { file:'land5.geojson',                 color:'#cddc39', weight:1.5, fillOpacity:0.5, label:'Land 5' },
+  land6:   { file:'land6.geojson',                 color:'#9e9d24', weight:1.5, fillOpacity:0.5, label:'Land 6' },
+  land7:   { file:'land7.geojson',                 color:'#f9a825', weight:1.5, fillOpacity:0.5, label:'Land 7' },
+  land8:   { file:'land8.geojson',                 color:'#e57c0f', weight:1.5, fillOpacity:0.5, label:'Land 8' },
+  land9:   { file:'land9.geojson',                 color:'#d84315', weight:1.5, fillOpacity:0.5, label:'Land 9' },
+};
+
+const layers = {};
+let map, currentOpacity = 0.8;
+
+// ═══════════════════════════════════════════════════════
+// MAP INIT
+// ═══════════════════════════════════════════════════════
+const BASEMAPS = {
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri — Satellite Imagery', maxZoom: 19
+  }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenTopoMap', maxZoom: 17
+  }),
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© CartoDB Dark', maxZoom: 19
+  })
+};
+
+map = L.map('map', {
+  center: [-17.75, 31.0],
+  zoom: 14,
+  zoomControl: true,
+  layers: [BASEMAPS.satellite]
+});
+
+// ── COORDINATE TRACKER ──
+map.on('mousemove', e => {
+  const lat = e.latlng.lat.toFixed(6);
+  const lon = e.latlng.lng.toFixed(6);
+  document.getElementById('coord-bar').textContent = `Lat ${lat} · Lon ${lon}`;
+  document.getElementById('coord-info').textContent = `Lat ${lat} · Lon ${lon}`;
+});
+
+// ═══════════════════════════════════════════════════════
+// LOAD GeoJSON
+// ═══════════════════════════════════════════════════════
+async function loadLayer(key) {
+  const cfg = LAYERS_CONFIG[key];
+  try {
+    const resp = await fetch(cfg.file);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const gj = await resp.json();
+
+    const lyr = L.geoJSON(gj, {
+      style: f => ({
+        color: cfg.color,
+        weight: cfg.weight,
+        fillColor: cfg.color,
+        fillOpacity: cfg.fillOpacity * currentOpacity,
+        opacity: 1,
+      }),
+      onEachFeature: (f, layer) => {
+        layer.on('click', () => showFeatureInfo(key, f, cfg));
+        layer.on('mouseover', function(e) {
+          this.setStyle({ weight: cfg.weight + 1.5, fillOpacity: Math.min(cfg.fillOpacity + 0.2, 0.9) });
+        });
+        layer.on('mouseout', function(e) {
+          lyr.resetStyle(this);
+        });
+
+        // tooltip
+        if (f.properties) {
+          const name = f.properties.Name || f.properties.name || f.properties.ID || cfg.label;
+          layer.bindTooltip(`<div style="font-family:'Space Mono',monospace;font-size:10px;background:#1a1208;color:#c8932a;padding:4px 8px;border-radius:4px;border:1px solid rgba(200,147,42,0.3)">${name}</div>`, {
+            sticky: true, opacity: 1, className: 'custom-tooltip'
+          });
+        }
+      }
+    });
+
+    layers[key] = lyr;
+    lyr.addTo(map);
+
+    // fit map to all loaded layers on first few loads
+    if (Object.keys(layers).length === 3) {
+      try {
+        const bounds = L.latLngBounds();
+        Object.values(layers).forEach(l => { try { bounds.extend(l.getBounds()); } catch(e){} });
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+      } catch(e) {}
+    }
+  } catch(err) {
+    console.warn(`Could not load ${cfg.file}:`, err);
+    // create empty placeholder so toggle still works gracefully
+    layers[key] = null;
+  }
+}
+
+function showFeatureInfo(key, feature, cfg) {
+  const p = feature.properties || {};
+  let html = `<h3>${cfg.label}</h3>`;
+  const skip = new Set(['geometry','type']);
+  const entries = Object.entries(p).filter(([k]) => !skip.has(k));
+  if (entries.length === 0) {
+    html += '<p style="color:#a89060;font-size:11px">No attributes available.</p>';
+  } else {
+    html += '<table>';
+    entries.forEach(([k, v]) => {
+      html += `<tr><td>${k}</td><td style="color:#f0e8d0">${v ?? '—'}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  // Also update sidebar
+  const panel = document.getElementById('feature-info');
+  panel.className = 'info-panel has-data';
+  panel.innerHTML = `
+    <div class="info-key">Layer</div>
+    <div class="info-val">${cfg.label}</div>
+    ${entries.map(([k,v]) => `<div class="info-key">${k}</div><div class="info-val">${v ?? '—'}</div>`).join('')}
+  `;
+  // Switch to info tab
+  switchTab('info', document.querySelectorAll('.tab-btn')[3]);
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function toggleLayer(key, el) {
+  const lyr = layers[key];
+  const tog = document.getElementById('toggle-' + key);
+  if (!lyr) return;
+  if (map.hasLayer(lyr)) {
+    map.removeLayer(lyr);
+    tog.classList.remove('on');
+    el.classList.remove('active-layer');
+  } else {
+    lyr.addTo(map);
+    tog.classList.add('on');
+    el.classList.add('active-layer');
+  }
+}
+
+function setBasemap(name, btn) {
+  document.querySelectorAll('.bm-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  Object.values(BASEMAPS).forEach(b => { if (map.hasLayer(b)) map.removeLayer(b); });
+  BASEMAPS[name].addTo(map);
+  map.setZoom(map.getZoom()); // re-trigger tiles
+}
+
+function setOpacity(val) {
+  currentOpacity = val / 100;
+  document.getElementById('opacity-val').textContent = val + '%';
+  const landKeys = ['land1ab','land1','land2','land3','land4','land5','land6','land7','land8','land9'];
+  landKeys.forEach(key => {
+    const lyr = layers[key];
+    if (!lyr) return;
+    const cfg = LAYERS_CONFIG[key];
+    lyr.setStyle({ fillOpacity: cfg.fillOpacity * currentOpacity });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// NDVI PHENOLOGICAL CURVE CHART
+// ═══════════════════════════════════════════════════════
+function buildCharts() {
+  // Phenological NDVI curves
+  const months = ['Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul'];
+
+  const ndviCtx = document.getElementById('ndviChart').getContext('2d');
+  new Chart(ndviCtx, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Tobacco',
+          data: [0.21, 0.24, 0.35, 0.52, 0.63, 0.70, 0.73, 0.65, 0.48, 0.32, 0.24, 0.21],
+          borderColor: '#c8932a',
+          backgroundColor: 'rgba(200,147,42,0.12)',
+          fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#c8932a',
+        },
+        {
+          label: 'Maize',
+          data: [0.18, 0.22, 0.40, 0.58, 0.72, 0.78, 0.75, 0.60, 0.38, 0.24, 0.19, 0.18],
+          borderColor: '#6db85c',
+          backgroundColor: 'rgba(109,184,92,0.10)',
+          fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#6db85c',
+        },
+        {
+          label: 'Pasture',
+          data: [0.28, 0.31, 0.38, 0.45, 0.50, 0.52, 0.51, 0.48, 0.43, 0.37, 0.31, 0.28],
+          borderColor: '#8bc34a',
+          backgroundColor: 'rgba(139,195,74,0.08)',
+          fill: true, tension: 0.4, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#8bc34a',
+          borderDash: [4,3],
+        },
+        {
+          label: 'Woodland',
+          data: [0.55, 0.57, 0.60, 0.63, 0.67, 0.68, 0.69, 0.68, 0.65, 0.62, 0.58, 0.55],
+          borderColor: '#1e7a1e',
+          backgroundColor: 'rgba(30,122,30,0.08)',
+          fill: true, tension: 0.4, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#1e7a1e',
+          borderDash: [6,3],
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: {
+            color: '#a89060', font: { family: 'Space Mono', size: 9 },
+            boxWidth: 12, padding: 8,
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(26,18,8,0.95)',
+          titleColor: '#c8932a', bodyColor: '#f0e8d0',
+          borderColor: 'rgba(200,147,42,0.3)', borderWidth: 1,
+          titleFont: { family: 'Space Mono', size: 10 },
+          bodyFont: { family: 'Space Mono', size: 10 },
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 } },
+          grid: { color: 'rgba(200,147,42,0.08)' },
+        },
+        y: {
+          min: 0, max: 1,
+          ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 }, stepSize: 0.2 },
+          grid: { color: 'rgba(200,147,42,0.08)' },
+          title: { display: true, text: 'NDVI', color: '#a89060', font: { family: 'Space Mono', size: 9 } }
+        }
+      }
+    }
+  });
+
+  // NDVI bar per land
+  const barCtx = document.getElementById('ndviBar').getContext('2d');
+  new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: ['L1ab','L1','L2','L3','L4','L5','L6','L7','L8','L9'],
+      datasets: [{
+        label: 'Mean NDVI',
+        data: [0.64, 0.58, 0.52, 0.47, 0.55, 0.43, 0.39, 0.61, 0.35, 0.50],
+        backgroundColor: [
+          '#c8932a','#a67c2e','#6db85c','#4a7c3f',
+          '#8bc34a','#cddc39','#9e9d24','#f9a825','#e57c0f','#d84315'
+        ],
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(26,18,8,0.95)',
+          titleColor: '#c8932a', bodyColor: '#f0e8d0',
+          borderColor: 'rgba(200,147,42,0.3)', borderWidth: 1,
+          titleFont: { family: 'Space Mono', size: 10 },
+          bodyFont: { family: 'Space Mono', size: 10 },
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 } }, grid: { display: false } },
+        y: { min: 0, max: 1, ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 }, stepSize: 0.2 }, grid: { color: 'rgba(200,147,42,0.08)' } }
+      }
+    }
+  });
+
+  // Land use pie-ish (horizontal bar)
+  const luCtx = document.getElementById('landUseChart').getContext('2d');
+  new Chart(luCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Tobacco','Maize','Pasture','Woodland','Water','Bare Soil'],
+      datasets: [{
+        label: 'Area (ha)',
+        data: [140, 85, 60, 45, 18, 22],
+        backgroundColor: ['#c8932a','#6db85c','#8bc34a','#1e7a1e','#3a7ebf','#d84315'],
+        borderRadius: 4, borderWidth: 0,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(26,18,8,0.95)',
+          titleColor: '#c8932a', bodyColor: '#f0e8d0',
+          borderColor: 'rgba(200,147,42,0.3)', borderWidth: 1,
+          titleFont: { family: 'Space Mono', size: 10 },
+          bodyFont: { family: 'Space Mono', size: 10 },
+          callbacks: { label: ctx => `  ${ctx.parsed.x} ha` }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 } }, grid: { color: 'rgba(200,147,42,0.08)' } },
+        y: { ticks: { color: '#a89060', font: { family: 'Space Mono', size: 9 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════
+async function init() {
+  buildCharts();
+
+  // Load all layers in parallel
+  const keys = Object.keys(LAYERS_CONFIG);
+  await Promise.allSettled(keys.map(k => loadLayer(k)));
+
+  // Auto-fit
+  try {
+    const bounds = L.latLngBounds();
+    Object.values(layers).forEach(l => { if (l) try { bounds.extend(l.getBounds()); } catch(e){} });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
+  } catch(e) {}
+
+  // Hide loader
+  setTimeout(() => {
+    const loader = document.getElementById('loader');
+    loader.classList.add('hidden');
+    setTimeout(() => loader.remove(), 600);
+  }, 800);
+}
+
+init();
+</script>
+</body>
+</html>
