@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>KRB · Kutsaga Agricultural Observatory</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet"
@@ -17,1226 +18,964 @@
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  >
-
-  <!-- Marker Cluster -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
-  >
-
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+    crossorigin=""
   >
 
   <!-- Application CSS -->
   <link rel="stylesheet" href="style.css">
-
-  <style>
-    :root {
-      --soil-dark:#1a1208;
-      --soil-mid:#2d1f0a;
-      --soil-warm:#3d2b0f;
-      --gold:#c8932a;
-      --green:#4a7c3f;
-      --green-bright:#6db85c;
-      --cream:#f0e8d0;
-      --muted:#a89060;
-      --border:rgba(200,147,42,.3);
-      --panel:rgba(26,18,8,.94);
-    }
-
-    * {
-      box-sizing:border-box;
-      margin:0;
-      padding:0;
-    }
-
-    html,
-    body {
-      width:100%;
-      height:100%;
-    }
-
-    body {
-      font-family:"Space Grotesk",sans-serif;
-      background:var(--soil-dark);
-      color:var(--cream);
-      overflow:hidden;
-    }
-
-    /* HEADER */
-
-    header {
-      height:58px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:0 20px;
-      background:var(--soil-mid);
-      border-bottom:1px solid var(--border);
-      position:relative;
-      z-index:2000;
-    }
-
-    .brand {
-      display:flex;
-      align-items:center;
-      gap:12px;
-    }
-
-    .brand-mark {
-      width:38px;
-      height:38px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:7px;
-      background:linear-gradient(
-        135deg,
-        var(--gold),
-        var(--green)
-      );
-      color:var(--soil-dark);
-      font-family:"Space Mono",monospace;
-      font-weight:700;
-      font-size:13px;
-    }
-
-    .brand h1 {
-      font-size:14px;
-      font-weight:600;
-      letter-spacing:.05em;
-    }
-
-    .brand p {
-      margin-top:2px;
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-      color:var(--muted);
-      letter-spacing:.08em;
-    }
-
-    .header-meta {
-      display:flex;
-      align-items:center;
-      gap:15px;
-    }
-
-    .season {
-      border:1px solid var(--border);
-      border-radius:20px;
-      padding:5px 10px;
-      color:var(--gold);
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-      letter-spacing:.08em;
-    }
-
-    .live {
-      display:flex;
-      align-items:center;
-      gap:7px;
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-      color:var(--muted);
-    }
-
-    .live-dot {
-      width:8px;
-      height:8px;
-      border-radius:50%;
-      background:#6db85c;
-      box-shadow:0 0 10px #6db85c;
-      animation:pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%,100% { opacity:1; }
-      50% { opacity:.35; }
-    }
-
-    /* APP */
-
-    .app {
-      display:flex;
-      height:calc(100vh - 58px);
-      width:100%;
-    }
-
-    /* SIDEBAR */
-
-    .sidebar {
-      width:330px;
-      min-width:330px;
-      height:100%;
-      background:var(--panel);
-      border-right:1px solid var(--border);
-      display:flex;
-      flex-direction:column;
-      overflow:hidden;
-      backdrop-filter:blur(12px);
-      position:relative;
-      z-index:1500;
-    }
-
-    .tabs {
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      border-bottom:1px solid var(--border);
-    }
-
-    .tab {
-      padding:12px 4px;
-      background:none;
-      border:0;
-      color:var(--muted);
-      cursor:pointer;
-      font-family:"Space Mono",monospace;
-      font-size:8px;
-      letter-spacing:.1em;
-      text-transform:uppercase;
-      border-bottom:2px solid transparent;
-    }
-
-    .tab:hover {
-      color:var(--cream);
-    }
-
-    .tab.active {
-      color:var(--gold);
-      border-bottom-color:var(--gold);
-    }
-
-    .tab-content {
-      display:none;
-      flex:1;
-      overflow-y:auto;
-      padding:15px;
-    }
-
-    .tab-content.active {
-      display:flex;
-      flex-direction:column;
-      gap:13px;
-    }
-
-    .tab-content::-webkit-scrollbar {
-      width:4px;
-    }
-
-    .tab-content::-webkit-scrollbar-thumb {
-      background:var(--border);
-      border-radius:4px;
-    }
-
-    .section-title {
-      display:flex;
-      align-items:center;
-      gap:8px;
-      color:var(--muted);
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-      letter-spacing:.14em;
-      text-transform:uppercase;
-    }
-
-    .section-title::after {
-      content:"";
-      flex:1;
-      height:1px;
-      background:var(--border);
-    }
-
-    /* BASEMAP */
-
-    .basemaps {
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:5px;
-    }
-
-    .basemap-btn {
-      padding:8px 4px;
-      background:rgba(0,0,0,.25);
-      border:1px solid var(--border);
-      border-radius:6px;
-      color:var(--muted);
-      cursor:pointer;
-      font-family:"Space Mono",monospace;
-      font-size:8px;
-      text-transform:uppercase;
-    }
-
-    .basemap-btn:hover,
-    .basemap-btn.active {
-      color:var(--gold);
-      border-color:var(--gold);
-      background:rgba(200,147,42,.12);
-    }
-
-    /* LAYERS */
-
-    .layer {
-      display:flex;
-      align-items:center;
-      gap:9px;
-      padding:8px;
-      margin-bottom:4px;
-      border:1px solid transparent;
-      border-radius:6px;
-      cursor:pointer;
-    }
-
-    .layer:hover {
-      background:rgba(200,147,42,.08);
-      border-color:var(--border);
-    }
-
-    .layer.active {
-      background:rgba(200,147,42,.1);
-      border-color:var(--border);
-    }
-
-    .swatch {
-      width:14px;
-      height:14px;
-      border-radius:3px;
-      flex-shrink:0;
-    }
-
-    .layer-name {
-      flex:1;
-      font-size:11px;
-    }
-
-    .switch {
-      width:28px;
-      height:16px;
-      border-radius:20px;
-      background:var(--soil-warm);
-      border:1px solid var(--border);
-      position:relative;
-    }
-
-    .switch::after {
-      content:"";
-      position:absolute;
-      width:12px;
-      height:12px;
-      left:1px;
-      top:1px;
-      border-radius:50%;
-      background:#fff;
-      transition:.2s;
-    }
-
-    .switch.on {
-      background:var(--green);
-      border-color:var(--green-bright);
-    }
-
-    .switch.on::after {
-      transform:translateX(12px);
-    }
-
-    /* CARDS */
-
-    .card {
-      padding:12px;
-      border:1px solid var(--border);
-      border-radius:8px;
-      background:rgba(0,0,0,.2);
-    }
-
-    .stats {
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:7px;
-    }
-
-    .stat-value {
-      color:var(--gold);
-      font-family:"Space Mono",monospace;
-      font-size:19px;
-      font-weight:700;
-    }
-
-    .stat-label {
-      color:var(--muted);
-      font-size:9px;
-      margin-top:4px;
-    }
-
-    /* LEGEND */
-
-    .ndvi-bar {
-      height:18px;
-      border-radius:5px;
-      background:
-        linear-gradient(
-          to right,
-          #d4691e,
-          #e8c44a,
-          #9fc94a,
-          #5aad3f,
-          #1e7a1e
-        );
-    }
-
-    .ndvi-labels {
-      display:flex;
-      justify-content:space-between;
-      color:var(--muted);
-      font-family:"Space Mono",monospace;
-      font-size:8px;
-      margin-top:5px;
-    }
-
-    /* MAP */
-
-    #map {
-      flex:1;
-      height:100%;
-      background:var(--soil-dark);
-    }
-
-    .map-overlay {
-      position:absolute;
-      z-index:1000;
-      pointer-events:none;
-    }
-
-    #coordinates {
-      bottom:18px;
-      left:345px;
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:6px;
-      padding:7px 11px;
-      color:var(--muted);
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-    }
-
-    #map-legend {
-      right:15px;
-      bottom:18px;
-      width:165px;
-      padding:11px;
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:8px;
-      backdrop-filter:blur(10px);
-    }
-
-    .map-legend-title {
-      color:var(--gold);
-      font-family:"Space Mono",monospace;
-      font-size:9px;
-      letter-spacing:.12em;
-      margin-bottom:8px;
-    }
-
-    /* LOADING */
-
-    #loading {
-      position:absolute;
-      inset:0;
-      z-index:5000;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      gap:14px;
-      background:var(--soil-dark);
-    }
-
-    #loading.hidden {
-      opacity:0;
-      pointer-events:none;
-      transition:.5s;
-    }
-
-    .loader-ring {
-      width:52px;
-      height:52px;
-      border:3px solid var(--border);
-      border-top-color:var(--gold);
-      border-radius:50%;
-      animation:spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform:rotate(360deg); }
-    }
-
-    #loading p {
-      font-family:"Space Mono",monospace;
-      color:var(--muted);
-      font-size:10px;
-      letter-spacing:.1em;
-      text-transform:uppercase;
-    }
-
-    /* INFO */
-
-    #feature-info {
-      line-height:1.6;
-      font-size:11px;
-    }
-
-    .info-key {
-      color:var(--muted);
-      font-family:"Space Mono",monospace;
-      font-size:8px;
-      text-transform:uppercase;
-      margin-top:7px;
-    }
-
-    .info-value {
-      color:var(--cream);
-      font-size:11px;
-    }
-
-    /* MOBILE */
-
-    @media(max-width:800px) {
-      .sidebar {
-        width:280px;
-        min-width:280px;
-      }
-
-      #coordinates {
-        left:295px;
-      }
-
-      .brand p {
-        display:none;
-      }
-
-      .season {
-        display:none;
-      }
-    }
-
-    @media(max-width:600px) {
-      .sidebar {
-        position:absolute;
-        left:0;
-        top:58px;
-        height:calc(100vh - 58px);
-        z-index:3000;
-        transform:translateX(0);
-      }
-
-      .sidebar.collapsed {
-        transform:translateX(-100%);
-      }
-
-      #coordinates {
-        left:10px;
-        bottom:10px;
-      }
-
-      #map-legend {
-        right:8px;
-        bottom:55px;
-      }
-    }
-
-    /* LEAFLET */
-
-    .leaflet-control-zoom a {
-      background:var(--panel) !important;
-      color:var(--gold) !important;
-      border-color:var(--border) !important;
-    }
-
-    .leaflet-control-zoom {
-      border-color:var(--border) !important;
-    }
-
-    .leaflet-popup-content-wrapper,
-    .leaflet-popup-tip {
-      background:var(--soil-mid);
-      color:var(--cream);
-    }
-
-    .leaflet-popup-content {
-      font-family:"Space Grotesk",sans-serif;
-    }
-  </style>
 </head>
 
 <body>
 
-<!-- LOADING -->
-<div id="loading">
-  <div class="loader-ring"></div>
-  <p>Loading KRB Agricultural Observatory</p>
-</div>
-
-<!-- HEADER -->
-<header>
-  <div class="brand">
-
-    <div class="brand-mark">
-      KRB
-    </div>
+  <!-- =====================================================
+       LOADING SCREEN
+       ===================================================== -->
+  <div class="loading-overlay" id="loader">
+    <div class="loading-ring"></div>
 
     <div>
-      <h1>Kutsaga Agricultural Observatory</h1>
-      <p>
-        AGRICULTURAL DATA SCIENCE · STATISTICS · ENGINEERING
-      </p>
-    </div>
+      <div class="loading-text">
+        Loading KRB Agricultural Observatory
+      </div>
 
+      <div class="loading-sub">
+        KRB · Kutsaga Research Board
+      </div>
+    </div>
   </div>
 
-  <div class="header-meta">
 
-    <div class="season">
-      SEASON 2025/26
-    </div>
+  <!-- =====================================================
+       HEADER
+       ===================================================== -->
+  <header>
 
-    <div class="live">
-      <span class="live-dot"></span>
-      LIVE
-    </div>
+    <div class="logo">
 
-  </div>
-</header>
-
-<!-- APPLICATION -->
-<div class="app">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar" id="sidebar">
-
-    <!-- TABS -->
-    <div class="tabs">
-
-      <button
-        class="tab active"
-        data-tab="layers">
-        Layers
-      </button>
-
-      <button
-        class="tab"
-        data-tab="ndvi">
-        NDVI
-      </button>
-
-      <button
-        class="tab"
-        data-tab="agri">
-        Agri
-      </button>
-
-      <button
-        class="tab"
-        data-tab="info">
-        Info
-      </button>
-
-    </div>
-
-    <!-- LAYERS TAB -->
-    <section
-      class="tab-content active"
-      id="tab-layers">
-
-      <div class="section-title">
-        Basemap
+      <div class="logo-mark">
+        KRB
       </div>
 
-      <div class="basemaps">
+      <div class="logo-text">
 
-        <button
-          class="basemap-btn"
-          data-basemap="osm">
-          OSM
-        </button>
+        <h1>
+          Kutsaga Agricultural Observatory
+        </h1>
 
-        <button
-          class="basemap-btn active"
-          data-basemap="satellite">
-          Satellite
-        </button>
-
-        <button
-          class="basemap-btn"
-          data-basemap="dark">
-          Dark
-        </button>
-
-      </div>
-
-      <div class="section-title">
-        Infrastructure
-      </div>
-
-      <div id="infrastructure-layers">
-
-        <div class="layer active" data-layer="dams">
-          <span
-            class="swatch"
-            style="background:#3a7ebf">
-          </span>
-
-          <span class="layer-name">
-            Dams & Water
-          </span>
-
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="rivers">
-          <span
-            class="swatch"
-            style="background:#5ba3d4">
-          </span>
-
-          <span class="layer-name">
-            Rivers
-          </span>
-
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="roads">
-          <span
-            class="swatch"
-            style="background:#d4c49a">
-          </span>
-
-          <span class="layer-name">
-            Roads
-          </span>
-
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="station">
-          <span
-            class="swatch"
-            style="background:#c8932a">
-          </span>
-
-          <span class="layer-name">
-            Research Station
-          </span>
-
-          <span class="switch on"></span>
-        </div>
-
-      </div>
-
-      <div class="section-title">
-        Land Parcels
-      </div>
-
-      <div id="land-layers">
-
-        <div class="layer active" data-layer="land1ab">
-          <span class="swatch" style="background:#c8932a"></span>
-          <span class="layer-name">Land 1ab · Tobacco</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land1">
-          <span class="swatch" style="background:#a67c2e"></span>
-          <span class="layer-name">Land 1</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land2">
-          <span class="swatch" style="background:#6db85c"></span>
-          <span class="layer-name">Land 2</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land3">
-          <span class="swatch" style="background:#4a7c3f"></span>
-          <span class="layer-name">Land 3</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land4">
-          <span class="swatch" style="background:#8bc34a"></span>
-          <span class="layer-name">Land 4</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land5">
-          <span class="swatch" style="background:#cddc39"></span>
-          <span class="layer-name">Land 5</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land6">
-          <span class="swatch" style="background:#9e9d24"></span>
-          <span class="layer-name">Land 6</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land7">
-          <span class="swatch" style="background:#f9a825"></span>
-          <span class="layer-name">Land 7</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land8">
-          <span class="swatch" style="background:#e57c0f"></span>
-          <span class="layer-name">Land 8</span>
-          <span class="switch on"></span>
-        </div>
-
-        <div class="layer active" data-layer="land9">
-          <span class="swatch" style="background:#d84315"></span>
-          <span class="layer-name">Land 9</span>
-          <span class="switch on"></span>
-        </div>
-
-      </div>
-
-      <div class="section-title">
-        Layer Opacity
-      </div>
-
-      <div class="card">
-
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          font-size:9px;
-          color:#a89060;
-          margin-bottom:7px;
-        ">
-          <span>Land Parcels</span>
-          <span id="opacity-value">80%</span>
-        </div>
-
-        <input
-          id="opacity-slider"
-          type="range"
-          min="0"
-          max="100"
-          value="80"
-          style="width:100%;accent-color:#c8932a"
-        >
-
-      </div>
-
-      <div class="section-title">
-        Observatory Metrics
-      </div>
-
-      <div class="stats">
-
-        <div class="card">
-          <div class="stat-value">
-            81.35%
-          </div>
-          <div class="stat-label">
-            Overall Accuracy
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="stat-value">
-            0.762
-          </div>
-          <div class="stat-label">
-            Kappa
-          </div>
-        </div>
-
-        <div class="card">
-          <div
-            class="stat-value"
-            id="total-features">
-            —
-          </div>
-          <div class="stat-label">
-            Features
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="stat-value">
-            0.73
-          </div>
-          <div class="stat-label">
-            Peak NDVI
-          </div>
-        </div>
-
-      </div>
-
-    </section>
-
-    <!-- NDVI TAB -->
-    <section
-      class="tab-content"
-      id="tab-ndvi">
-
-      <div class="section-title">
-        NDVI Classification
-      </div>
-
-      <div class="card">
-
-        <div class="ndvi-bar"></div>
-
-        <div class="ndvi-labels">
-          <span>-1</span>
-          <span>0</span>
-          <span>.4</span>
-          <span>1</span>
-        </div>
-
-      </div>
-
-      <div class="stats">
-
-        <div class="card">
-          <div class="stat-value">0.73</div>
-          <div class="stat-label">
-            Peak · Feb 2026
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="stat-value">0.21</div>
-          <div class="stat-label">
-            Minimum · Aug 2025
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="stat-value">0.48</div>
-          <div class="stat-label">
-            Season Mean
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="stat-value">+0.12</div>
-          <div class="stat-label">
-            Year-on-Year
-          </div>
-        </div>
-
-      </div>
-
-      <div class="card">
-
-        <div class="section-title"
-             style="margin-bottom:10px">
-          Phenology
-        </div>
-
-        <canvas
-          id="ndviChart"
-          height="210">
-        </canvas>
-
-      </div>
-
-      <div class="card">
-
-        <div class="section-title"
-             style="margin-bottom:10px">
-          Land NDVI
-        </div>
-
-        <canvas
-          id="ndviBar"
-          height="190">
-        </canvas>
-
-      </div>
-
-    </section>
-
-    <!-- AGRI TAB -->
-    <section
-      class="tab-content"
-      id="tab-agri">
-
-      <div class="section-title">
-        Agricultural Colour Index
-      </div>
-
-      <div class="card">
-
-        <p style="
-          font-size:10px;
-          color:#a89060;
-          line-height:1.6;
-        ">
-          Remote-sensing interpretation of agricultural
-          land cover and vegetation condition.
+        <p>
+          Agricultural Data Science, Statistics & Engineering
         </p>
 
       </div>
 
-      <div class="layer">
+    </div>
 
-        <span class="swatch"
-              style="background:#c8932a">
-        </span>
 
-        <div class="layer-name">
-          Tobacco — Burley
-          <div style="color:#a89060;font-size:8px">
-            NDVI 0.55–0.73
-          </div>
-        </div>
+    <div class="header-right">
 
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#6db85c">
-        </span>
-
-        <div class="layer-name">
-          Maize / Cereals
-          <div style="color:#a89060;font-size:8px">
-            NDVI 0.60–0.80
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#8bc34a">
-        </span>
-
-        <div class="layer-name">
-          Pasture / Grassland
-          <div style="color:#a89060;font-size:8px">
-            NDVI 0.35–0.55
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#cddc39">
-        </span>
-
-        <div class="layer-name">
-          Bare / Fallow
-          <div style="color:#a89060;font-size:8px">
-            NDVI 0.10–0.30
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#3a7ebf">
-        </span>
-
-        <div class="layer-name">
-          Water Bodies
-          <div style="color:#a89060;font-size:8px">
-            NDWI &gt; 0.2
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#d84315">
-        </span>
-
-        <div class="layer-name">
-          Bare Soil / Erosion
-          <div style="color:#a89060;font-size:8px">
-            NDVI &lt; 0.15
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#1e7a1e">
-        </span>
-
-        <div class="layer-name">
-          Woodland / Bush
-          <div style="color:#a89060;font-size:8px">
-            NDVI 0.65–0.85
-          </div>
-        </div>
-
-      </div>
-
-      <div class="layer">
-
-        <span class="swatch"
-              style="background:#f9a825">
-        </span>
-
-        <div class="layer-name">
-          Crop Stress
-          <div style="color:#a89060;font-size:8px">
-            NDVI decline &gt;20%
-          </div>
-        </div>
-
-      </div>
-
-    </section>
-
-    <!-- INFO TAB -->
-    <section
-      class="tab-content"
-      id="tab-info">
-
-      <div class="section-title">
-        Feature Information
-      </div>
+      <span class="season-badge">
+        Season 2025/26
+      </span>
 
       <div
-        class="card"
-        id="feature-info">
+        class="live-dot"
+        title="Live Data"
+      ></div>
 
-        <div style="
-          color:#a89060;
-          text-align:center;
-          padding:10px;
-          font-size:10px;
-        ">
-          Click a map feature to inspect
-          its properties.
-        </div>
-
-      </div>
-
-      <div class="section-title">
-        Observatory
-      </div>
-
-      <div class="card">
-
-        <div class="info-key">
-          Organisation
-        </div>
-
-        <div class="info-value">
-          Kutsaga Research Board — ADSE
-        </div>
-
-        <div class="info-key">
-          Season
-        </div>
-
-        <div class="info-value">
-          2025 / 2026
-        </div>
-
-        <div class="info-key">
-          Imagery
-        </div>
-
-        <div class="info-value">
-          Sentinel-2 MSI · 10m
-        </div>
-
-        <div class="info-key">
-          Classification
-        </div>
-
-        <div class="info-value">
-          Random Forest
-        </div>
-
-        <div class="info-key">
-          Platform
-        </div>
-
-        <div class="info-value">
-          Google Earth Engine
-        </div>
-
-        <div class="info-key">
-          CRS
-        </div>
-
-        <div class="info-value">
-          WGS84 / EPSG:4326
-        </div>
-
-      </div>
-
-    </section>
-
-  </aside>
-
-  <!-- MAP -->
-  <main id="map"></main>
-
-  <!-- MAP LEGEND -->
-  <div
-    id="map-legend"
-    class="map-overlay">
-
-    <div class="map-legend-title">
-      NDVI INDEX
     </div>
 
-    <div class="ndvi-bar"></div>
+  </header>
 
-    <div class="ndvi-labels">
-      <span>-1</span>
-      <span>0</span>
-      <span>.5</span>
-      <span>1</span>
+
+  <!-- =====================================================
+       MAIN APPLICATION
+       ===================================================== -->
+  <div class="app">
+
+    <!-- ===================================================
+         SIDEBAR
+         =================================================== -->
+    <aside class="sidebar">
+
+      <!-- TABS -->
+      <div class="sidebar-tabs">
+
+        <button
+          class="tab-btn active"
+          data-tab="layers"
+          onclick="switchTab('layers', this)"
+        >
+          Layers
+        </button>
+
+        <button
+          class="tab-btn"
+          data-tab="ndvi"
+          onclick="switchTab('ndvi', this)"
+        >
+          NDVI
+        </button>
+
+        <button
+          class="tab-btn"
+          data-tab="agri"
+          onclick="switchTab('agri', this)"
+        >
+          Agri
+        </button>
+
+        <button
+          class="tab-btn"
+          data-tab="info"
+          onclick="switchTab('info', this)"
+        >
+          Info
+        </button>
+
+      </div>
+
+
+      <!-- =================================================
+           LAYERS TAB
+           ================================================= -->
+      <section
+        class="tab-content active"
+        id="tab-layers"
+      >
+
+        <!-- BASEMAP -->
+        <div class="layer-group">
+
+          <div class="layer-group-label">
+            Basemap
+          </div>
+
+          <div class="basemap-switcher">
+
+            <button
+              class="bm-btn active"
+              onclick="setBasemap('satellite', this)"
+            >
+              Satellite
+            </button>
+
+            <button
+              class="bm-btn"
+              onclick="setBasemap('topo', this)"
+            >
+              Topo
+            </button>
+
+            <button
+              class="bm-btn"
+              onclick="setBasemap('dark', this)"
+            >
+              Dark
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- INFRASTRUCTURE -->
+        <div class="layer-group">
+
+          <div class="layer-group-label">
+            Infrastructure
+          </div>
+
+
+          <div
+            id="layer-dams"
+            class="layer-item active-layer"
+            onclick="toggleLayer('dams', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#3a7ebf"
+            ></div>
+
+            <span class="layer-name">
+              Dams & Water
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-dams"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-rivers"
+            class="layer-item active-layer"
+            onclick="toggleLayer('rivers', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#5ba3d4"
+            ></div>
+
+            <span class="layer-name">
+              Rivers
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-rivers"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-roads"
+            class="layer-item active-layer"
+            onclick="toggleLayer('roads', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#d4c49a"
+            ></div>
+
+            <span class="layer-name">
+              Roads
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-roads"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-station"
+            class="layer-item active-layer"
+            onclick="toggleLayer('station', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#c8932a"
+            ></div>
+
+            <span class="layer-name">
+              Research Station
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-station"
+            ></div>
+          </div>
+
+        </div>
+
+
+        <!-- LAND PARCELS -->
+        <div class="layer-group">
+
+          <div class="layer-group-label">
+            Land Parcels
+          </div>
+
+
+          <div
+            id="layer-land1ab"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land1ab', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#c8932a"
+            ></div>
+
+            <span class="layer-name">
+              Land 1ab (Tobacco)
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land1ab"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land1"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land1', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#a67c2e"
+            ></div>
+
+            <span class="layer-name">
+              Land 1
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land1"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land2"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land2', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#6db85c"
+            ></div>
+
+            <span class="layer-name">
+              Land 2
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land2"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land3"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land3', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#4a7c3f"
+            ></div>
+
+            <span class="layer-name">
+              Land 3
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land3"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land4"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land4', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#8bc34a"
+            ></div>
+
+            <span class="layer-name">
+              Land 4
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land4"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land5"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land5', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#cddc39"
+            ></div>
+
+            <span class="layer-name">
+              Land 5
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land5"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land6"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land6', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#9e9d24"
+            ></div>
+
+            <span class="layer-name">
+              Land 6
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land6"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land7"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land7', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#f9a825"
+            ></div>
+
+            <span class="layer-name">
+              Land 7
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land7"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land8"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land8', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#e57c0f"
+            ></div>
+
+            <span class="layer-name">
+              Land 8
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land8"
+            ></div>
+          </div>
+
+
+          <div
+            id="layer-land9"
+            class="layer-item active-layer"
+            onclick="toggleLayer('land9', this)"
+          >
+            <div
+              class="layer-swatch"
+              style="background:#d84315"
+            ></div>
+
+            <span class="layer-name">
+              Land 9
+            </span>
+
+            <div
+              class="layer-toggle on"
+              id="toggle-land9"
+            ></div>
+          </div>
+
+        </div>
+
+
+        <!-- OPACITY -->
+        <div class="layer-group">
+
+          <div class="layer-group-label">
+            Layer Opacity
+          </div>
+
+          <div class="opacity-control">
+
+            <div class="opacity-label">
+              <span>Land Parcels</span>
+              <span id="opacity-val">80%</span>
+            </div>
+
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value="80"
+              oninput="setOpacity(this.value)"
+            >
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           NDVI TAB
+           ================================================= -->
+      <section
+        class="tab-content"
+        id="tab-ndvi"
+      >
+
+        <div
+          class="layer-group-label"
+          style="margin-bottom:0"
+        >
+          NDVI Classification
+        </div>
+
+
+        <div class="ndvi-legend">
+
+          <div class="ndvi-legend-bar"></div>
+
+          <div class="ndvi-legend-labels">
+
+            <div class="ndvi-label">
+              −1<br>
+              <span style="color:#d4691e">Bare</span>
+            </div>
+
+            <div class="ndvi-label">
+              0<br>
+              <span style="color:#e8c44a">Sparse</span>
+            </div>
+
+            <div class="ndvi-label">
+              0.4<br>
+              <span style="color:#9fc94a">Moderate</span>
+            </div>
+
+            <div class="ndvi-label">
+              1<br>
+              <span style="color:#1e7a1e">Dense</span>
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="chart-wrap">
+
+          <div class="chart-title">
+            Phenological NDVI Curves — 2025/26
+          </div>
+
+          <canvas
+            id="ndviChart"
+            height="220"
+          ></canvas>
+
+        </div>
+
+
+        <div class="stats-row">
+
+          <div class="stat-card">
+            <div class="stat-val">0.73</div>
+            <div class="stat-label">
+              Peak NDVI<br>
+              Feb 2026
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-val">0.21</div>
+            <div class="stat-label">
+              Min NDVI<br>
+              Aug 2025
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-val">0.48</div>
+            <div class="stat-label">
+              Mean NDVI<br>
+              Season Avg
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-val">+0.12</div>
+            <div class="stat-label">
+              ΔYear on<br>
+              Year
+            </div>
+          </div>
+
+        </div>
+
+
+        <div class="chart-wrap">
+
+          <div class="chart-title">
+            Land Cover NDVI Distribution
+          </div>
+
+          <canvas
+            id="ndviBar"
+            height="200"
+          ></canvas>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           AGRI TAB
+           ================================================= -->
+      <section
+        class="tab-content"
+        id="tab-agri"
+      >
+
+        <div
+          class="layer-group-label"
+          style="margin-bottom:0"
+        >
+          Agricultural Colour Index
+        </div>
+
+
+        <div class="agri-index">
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#c8932a,#a67c2e)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Tobacco — Burley
+              </div>
+
+              <div class="agri-desc">
+                NDVI 0.55–0.73
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#6db85c,#4a7c3f)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Maize / Cereals
+              </div>
+
+              <div class="agri-desc">
+                NDVI 0.60–0.80
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#8bc34a,#558b2f)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Pasture / Grassland
+              </div>
+
+              <div class="agri-desc">
+                NDVI 0.35–0.55
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#cddc39,#9e9d24)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Bare / Fallow
+              </div>
+
+              <div class="agri-desc">
+                NDVI 0.10–0.30
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#3a7ebf,#1a4e8a)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Water Bodies
+              </div>
+
+              <div class="agri-desc">
+                NDWI &gt; 0.2
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#d84315,#b71c1c)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Bare Soil / Erosion
+              </div>
+
+              <div class="agri-desc">
+                NDVI &lt; 0.15
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#1e7a1e,#0a4a0a)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Woodland / Bush
+              </div>
+
+              <div class="agri-desc">
+                NDVI 0.65–0.85
+              </div>
+            </div>
+          </div>
+
+
+          <div class="agri-row">
+            <div
+              class="agri-swatch"
+              style="background:linear-gradient(135deg,#f9a825,#e65100)"
+            ></div>
+
+            <div class="agri-info">
+              <div class="agri-name">
+                Crop Stress
+              </div>
+
+              <div class="agri-desc">
+                NDVI decline &gt;20%
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+
+        <div
+          class="chart-wrap"
+          style="margin-top:4px"
+        >
+
+          <div class="chart-title">
+            Land Use Distribution (ha)
+          </div>
+
+          <canvas
+            id="landUseChart"
+            height="200"
+          ></canvas>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           INFO TAB
+           ================================================= -->
+      <section
+        class="tab-content"
+        id="tab-info"
+      >
+
+        <div
+          class="layer-group-label"
+          style="margin-bottom:0"
+        >
+          Feature Information
+        </div>
+
+
+        <div
+          class="info-panel"
+          id="feature-info"
+        >
+          Click any feature on the map to inspect its properties.
+        </div>
+
+
+        <div class="layer-group-label">
+          About this Map
+        </div>
+
+
+        <div
+          class="info-panel has-data"
+          style="text-align:left"
+        >
+
+          <div class="info-key">
+            Organisation
+          </div>
+
+          <div class="info-val">
+            Kutsaga Research Board — ADSE
+          </div>
+
+
+          <div class="info-key">
+            Affiliation
+          </div>
+
+          <div class="info-val">
+            Ministry of Lands, Agriculture & Rural Resettlement
+          </div>
+
+
+          <div class="info-key">
+            Season
+          </div>
+
+          <div class="info-val">
+            2025 / 2026
+          </div>
+
+
+          <div class="info-key">
+            Imagery
+          </div>
+
+          <div class="info-val">
+            Sentinel-2 MSI (10m)
+          </div>
+
+
+          <div class="info-key">
+            Classification
+          </div>
+
+          <div class="info-val">
+            Random Forest — GEE
+          </div>
+
+
+          <div class="info-key">
+            CRS
+          </div>
+
+          <div class="info-val">
+            WGS84 / EPSG:4326
+          </div>
+
+        </div>
+
+
+        <div class="layer-group-label">
+          Coordinates
+        </div>
+
+
+        <div
+          class="info-panel has-data"
+          id="coord-info"
+        >
+          Hover over the map to see coordinates.
+        </div>
+
+      </section>
+
+    </aside>
+
+
+    <!-- ===================================================
+         MAP
+         =================================================== -->
+    <main id="map"></main>
+
+
+    <!-- MAP NDVI LEGEND -->
+    <div class="map-legend">
+
+      <div class="map-legend-title">
+        NDVI Index
+      </div>
+
+      <div class="map-legend-bar"></div>
+
+      <div class="map-legend-ticks">
+        <span>−1</span>
+        <span>0</span>
+        <span>0.5</span>
+        <span>1</span>
+      </div>
+
+    </div>
+
+
+    <!-- COORDINATES -->
+    <div
+      class="coord-display"
+      id="coord-bar"
+    >
+      Lat — · Lon —
     </div>
 
   </div>
 
-  <!-- COORDINATES -->
-  <div
-    id="coordinates"
-    class="map-overlay">
 
-    Lat — · Lon — · Zoom —
+  <!-- =====================================================
+       EXTERNAL JAVASCRIPT
+       ===================================================== -->
 
-  </div>
+  <!-- Leaflet -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
 
-</div>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<!-- Leaflet -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Marker Cluster -->
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-<!-- YOUR APPLICATION -->
-<script src="app.js"></script>
+  <!-- Your application -->
+  <script src="app.js"></script>
 
 </body>
 </html>
